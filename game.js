@@ -21,7 +21,7 @@ let enemy1Face = '🤢'
 let enemy2Face = '😷'
 let enemy3Face = '😈'
 let enemy1X = ((canvas.width / 2) / 2) / 2
-let enemy1Y = 30
+let enemy1Y = 80
 let enemy1Fontsize = 32
 let dx = 2
 let enemyMoveDistanceY = 2
@@ -29,6 +29,9 @@ let eBullets= []
 let bullets = []
 let txt = 'hello'
 let player1 = '🗻'
+let life = 3
+let lifeIcon = '🖤'
+let lifeCheck = true
 let allowClick = true;
 
 
@@ -275,6 +278,8 @@ setInterval(() => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // Clear canvas [END]
 
+    ctx.font = '64px'
+    ctx.fillText(`${lifeIcon.repeat(life)}`, 15, 40)
 
     ctx.font = '32px Georgia'
     ctx.fillText(player1, mouse.x, canvas.height - 15)
@@ -303,6 +308,36 @@ setInterval(() => {
         v.draw()
         if (v.y > canvas.height) {
             eBullets.splice(i,1)
+        }
+        if (v.x < mouse.x + 38 && v.x + v.width > mouse.x &&
+            v.y < canvas.height - 20 && v.y + v.height > canvas.height - 20) {
+            console.log('hit player');
+            player1 = ''
+            setTimeout(() => {
+                player1 = '🗻'
+                setTimeout(() => {
+                    player1 = ''
+                    setTimeout(() => {
+                        player1 = '🗻'
+                        setTimeout(() => {
+                            player1 = ''
+                            setTimeout(() => {
+                                player1 = '🗻'
+                            }, 100);
+                        }, 100);
+                    }, 100);
+                }, 100);
+            }, 100);
+            if (lifeCheck) {
+                lifeCheck = false
+                life -= 1
+                setTimeout(() => {
+                    lifeCheck = true
+                }, 1500);
+            }
+            if (life <= 0) {
+                location.reload()
+            }
         }
     });
     // console.log(eBullets);
@@ -486,24 +521,25 @@ function deathAnimation(ran,v2) {
 }
 
 function eShoot(eFace) {
-    let oriFace = eFace.text
-    if (eFace.text == '🤢') {
-        eFace.text = '🤮'
-        eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'green'))
-        setTimeout(() => {
-            eFace.text = '🤢'
-        }, 800);
-    } else if (eFace.text == '😷') {
-        eFace.text = '😩'
-        eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'yellow'))
-        setTimeout(() => {
-            eFace.text = '😷'
-        }, 800);
-    } else if (eFace.text == '😈') {
-        eFace.text = '👿'
-        eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'red', 'black'))
-        setTimeout(() => {
-            eFace.text = '😈'
-        }, 800);
+    if (!eFace == undefined || !eFace == null) {
+        if (eFace.text == '🤢') {
+            eFace.text = '🤮'
+            eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'green'))
+            setTimeout(() => {
+                eFace.text = '🤢'
+            }, 800);
+        } else if (eFace.text == '😷') {
+            eFace.text = '😩'
+            eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'yellow'))
+            setTimeout(() => {
+                eFace.text = '😷'
+            }, 800);
+        } else if (eFace.text == '😈') {
+            eFace.text = '👿'
+            eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'red', 'black'))
+            setTimeout(() => {
+                eFace.text = '😈'
+            }, 800);
+        }
     }
 }
