@@ -16,48 +16,23 @@ const mouse = {
     y: innerHeight / 2
 }
 
-let emeny = []
+let enemy1 = []
+let enemy1Face = '🤢'
+let enemy1X = ((canvas.width / 2) / 2) / 2
+let enemy1Y = 30
+let enemy1Fontsize = 32
+let dx = 2
+let enemyMoveDistanceY = 2
 let bullets = []
 let txt = 'hello'
 let player1 = '🗻'
 let allowClick = true;
 
-// let newT = new TextObj(txt, 50, mouse.y, 0, 64, 'red')
+
+// let newT = new TextC(txt, 50, mouse.y, 0, 64, 'red')
 
 // Init [END]
 
-// Draw [START]
-
-// ctx.beginPath()
-// ctx.font = '64px Georgia'
-// ctx.fillText('hello',mouse.x,mouse.y)
-
-
-
-// Draw [END]
-
-// Animation [START]
-
-setInterval(() => {
-    // Clear canvas each frame Must to have [START]
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Clear canvas [END]
-
-
-    ctx.font = '32px Georgia'
-    ctx.fillText(player1, mouse.x, canvas.height - 15)
-
-    bullets.forEach((v, i) => {
-        v.y -= 2
-        v.draw()
-        if (v.y < 0) {
-            bullets.splice(i, 1)
-        }
-    })
-
-}, 10);
-
-// Animation [END]
 
 // Classes [START]
 
@@ -147,79 +122,166 @@ class RectangleObj {
     }
 }
 
-class TextObj {
-    // you create new Rectangles by calling this as a function
-    // these are the arguments you pass in
-    // add default values to avoid errors on empty arguments
+// class TextC {
+//     // you create new Rectangles by calling this as a function
+//     // these are the arguments you pass in
+//     // add default values to avoid errors on empty arguments
+//     constructor(
+//         text = '', x = 0, y = 0,
+//         width = 0, fontsize = 16, fillColor = 'black'
+//     ) {
+//         // ensure the arguments passed in are numbers
+//         this.text = String(text)
+//         this.x = Number(x)
+//         this.y = Number(y)
+//         this.width = Number(width)
+//         this.fontsize = Number(fontsize)
+//         this.fillColor = String(fillColor)
+//     }
+
+//     // get keyword causes this method to be called
+//     get area() {
+//         return this.width
+//     }
+
+//     // gets the X position of the left side
+//     get left() {
+//         // origin is at top left so just return x
+//         return this.x
+//     }
+
+//     // get X position of right side
+//     get right() {
+//         // x is left position + the width to get end point
+//         return this.x + this.width
+//     }
+
+//     // get the Y position of top side
+//     get top() {
+//         // origin is at top left so just return y
+//         return this.y + (this.fontsize / 2)
+//     }
+
+//     // get Y position at bottom
+//     // get bottom() {
+//     //     return this.y + this.height
+//     // }
+
+//     // draw rectangle to screen
+//     draw() {
+//         // destructuring
+//         const {
+//             text,
+//             x,
+//             y,
+//             width,
+//             fillColor,
+//         } = this
+
+//         // saves the current styles set elsewhere
+//         // to avoid overwriting them
+//         ctx.save()
+
+//         // Draw Text
+//         ctx.font = `${this.fontsize}px`
+//         ctx.fillText(text, x, y, width)
+//         ctx.fillStyle = `${fillColor}`
+
+//         // restores the styles from earlier
+//         // preventing the colors used here
+//         // from polluting other drawings
+//         ctx.restore()
+//     }
+// }
+
+class TextC {
+
     constructor(
-        text = '', x = 0, y = 0,
-        width = 0, fontsize = 16, fillColor = 'black'
+        text = '',
+        x = 0,
+        y = 0,
+        fontSize = 0
     ) {
-        // ensure the arguments passed in are numbers
-        this.text = String(text)
+        this.text = text
         this.x = Number(x)
         this.y = Number(y)
-        this.width = Number(width)
-        this.fontsize = Number(fontsize)
-        this.fillColor = String(fillColor)
+        this.fontSize = Number(fontSize)
     }
 
-    // get keyword causes this method to be called
-    get area() {
-        return this.width
-    }
-
-    // gets the X position of the left side
-    get left() {
-        // origin is at top left so just return x
-        return this.x
-    }
-
-    // get X position of right side
-    get right() {
-        // x is left position + the width to get end point
-        return this.x + this.width
-    }
-
-    // get the Y position of top side
-    get top() {
-        // origin is at top left so just return y
-        return this.y + (this.fontsize / 2)
-    }
-
-    // get Y position at bottom
-    // get bottom() {
-    //     return this.y + this.height
-    // }
-
-    // draw rectangle to screen
     draw() {
-        // destructuring
         const {
             text,
             x,
             y,
-            width,
-            fillColor,
+            fontSize
         } = this
 
-        // saves the current styles set elsewhere
-        // to avoid overwriting them
-        ctx.save()
-
-        // Draw Text
-        ctx.font = `${this.fontsize}px`
-        ctx.fillText(text, x, y, width)
-        ctx.fillStyle = `${fillColor}`
-
-        // restores the styles from earlier
-        // preventing the colors used here
-        // from polluting other drawings
-        ctx.restore()
+        ctx.font = `${fontSize}px`
+        ctx.fillText(text, x, y)
     }
+
 }
 
 // Classes [END]
+
+
+// Draw [START]
+
+// ctx.beginPath()
+// ctx.font = '64px Georgia'
+// ctx.fillText('hello',mouse.x,mouse.y)
+
+for (let i = 0; i < 10; i++) {
+    if (i == 0) {
+        enemy1.push(new TextC(enemy1Face, enemy1X, enemy1Y, enemy1Fontsize))
+    } else {
+        console.log(enemy1);
+        enemy1.push(new TextC(enemy1Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
+    }
+
+}
+
+// Draw [END]
+
+// Animation [START]
+
+setInterval(() => {
+    // Clear canvas each frame Must to have [START]
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Clear canvas [END]
+
+
+    ctx.font = '32px Georgia'
+    ctx.fillText(player1, mouse.x, canvas.height - 15)
+
+    enemy1.forEach((v,i) => {
+        v.x += dx
+        if (v.x + dx +45 > canvas.width || v.x + dx <= 0) {
+            dx = -dx;
+            if (i == 0) {
+                v.x += dx*2
+            }
+            enemy1.forEach((v,i) => {
+                v.y += 7
+                if(i == 0){v.x +=dx}
+            })
+        }
+        v.draw()
+    })
+
+    bullets.forEach((v, i) => {
+        v.y -= 2
+        v.draw()
+        if (v.y < 0) {
+            bullets.splice(i, 1)
+        }
+    })
+
+}, 10);
+
+// Animation [END]
+
+
 
 // Eventlistners [START]
 
@@ -238,22 +300,22 @@ window.addEventListener('resize', () => {
 
 addEventListener('click', () => {
     if (allowClick) {
-    player1 = '🌋'
-    console.log('click');
-    bullets.push(new RectangleObj(mouse.x + 17, canvas.height - 45, 5, 5, 'red'))
-    setTimeout(() => {
-        player1 = '🗻'
-    }, 200)
+        player1 = '🌋'
+        console.log('click');
+        bullets.push(new RectangleObj(mouse.x + 17, canvas.height - 45, 5, 5, 'red'))
+        setTimeout(() => {
+            player1 = '🗻'
+        }, 200)
 
-    console.log(bullets);
+        console.log(bullets);
 
-    allowClick = false
-    setTimeout(() => {
-        allowClick = true
-    }, 1000)
+        allowClick = false
+        setTimeout(() => {
+            allowClick = true
+        }, 1000)
     } else {
         console.log(`too fast`);
-}
+    }
 })
 
 // Eventlistners [END]
