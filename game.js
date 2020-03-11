@@ -280,81 +280,9 @@ setInterval(() => {
             if (v.x < v2.x + 32 && v.x + v.width > v2.x &&
                 v.y < v2.y + 32 && v.y + v.height > v2.y) {
                 console.log('hit');
-                let ran = Math.floor(Math.random() * 5)
-                if (ran == 0) {
-                    v2.text = '💢'
-                    setTimeout(() => {
-                        v2.text = '🤬'
-                        setTimeout(() => {
-                            v2.text = '💢'
-                            setTimeout(() => {
-                                v2.text = '🤬'
-                                setTimeout(() => {
-                                    v2.text = '💢'
-                                }, 100);
-                            }, 100);
-                        }, 100);
-                    }, 100);
-                } else if (ran == 1) {
-                    v2.text = '🔅'
-                    setTimeout(() => {
-                        v2.text = '🔆'
-                        setTimeout(() => {
-                            v2.text = '🔅'
-                            setTimeout(() => {
-                                v2.text = '🔆'
-                                setTimeout(() => {
-                                    v2.text = '🔅'
-                                }, 100);
-                            }, 100);
-                        }, 100);
-                    }, 100);
-                } else if (ran == 2) {
-                    v2.text = '🔴'
-                    setTimeout(() => {
-                        v2.text = '🔶'
-                        setTimeout(() => {
-                            v2.text = '🔴'
-                            setTimeout(() => {
-                                v2.text = '🔶'
-                                setTimeout(() => {
-                                    v2.text = '🔴'
-                                }, 100);
-                            }, 100);
-                        }, 100);
-                    }, 100);
-                } else if (ran == 3) {
-                    v2.text = '⭕'
-                    setTimeout(() => {
-                        v2.text = '⛔'
-                        setTimeout(() => {
-                            v2.text = '⭕'
-                            setTimeout(() => {
-                                v2.text = '⛔'
-                                setTimeout(() => {
-                                    v2.text = '⭕'
-                                }, 100);
-                            }, 100);
-                        }, 100);
-                    }, 100);
-                } else {
-                    v2.text = '🖤'
-                    setTimeout(() => {
-                        v2.text = '💔'
-                        setTimeout(() => {
-                            v2.text = '🖤'
-                            setTimeout(() => {
-                                v2.text = '💔'
-                                setTimeout(() => {
-                                    v2.text = '🖤'
-                                }, 100);
-                            }, 100);
-                        }, 100);
-                    }, 100);
-                }
+                deathAnimation(Math.floor(Math.random() * 5),v2)
                 bullets.splice(i, 1)
                 setTimeout(() => {
-
                     enemy1.splice(i2, 1)
                 }, 500);
             }
@@ -406,3 +334,79 @@ addEventListener('click', () => {
 })
 
 // Eventlistners [END]
+
+// functions [START]
+
+function deathAnimation(ran,v2) {
+    if (ran == 0) {
+        v2.text = '💢'
+        setTimeout(() => {
+            v2.text = '🤬'
+            setTimeout(() => {
+                v2.text = '💢'
+                setTimeout(() => {
+                    v2.text = '🤬'
+                    setTimeout(() => {
+                        v2.text = '💢'
+                    }, 100);
+                }, 100);
+            }, 100);
+        }, 100);
+    } else if (ran == 1) {
+        v2.text = '🔅'
+        setTimeout(() => {
+            v2.text = '🔆'
+            setTimeout(() => {
+                v2.text = '🔅'
+                setTimeout(() => {
+                    v2.text = '🔆'
+                    setTimeout(() => {
+                        v2.text = '🔅'
+                    }, 100);
+                }, 100);
+            }, 100);
+        }, 100);
+    } else if (ran == 2) {
+        v2.text = '🔴'
+        setTimeout(() => {
+            v2.text = '🔶'
+            setTimeout(() => {
+                v2.text = '🔴'
+                setTimeout(() => {
+                    v2.text = '🔶'
+                    setTimeout(() => {
+                        v2.text = '🔴'
+                    }, 100);
+                }, 100);
+            }, 100);
+        }, 100);
+    } else if (ran == 3) {
+        v2.text = '⭕'
+        setTimeout(() => {
+            v2.text = '⛔'
+            setTimeout(() => {
+                v2.text = '⭕'
+                setTimeout(() => {
+                    v2.text = '⛔'
+                    setTimeout(() => {
+                        v2.text = '⭕'
+                    }, 100);
+                }, 100);
+            }, 100);
+        }, 100);
+    } else {
+        v2.text = '🖤'
+        setTimeout(() => {
+            v2.text = '💔'
+            setTimeout(() => {
+                v2.text = '🖤'
+                setTimeout(() => {
+                    v2.text = '💔'
+                    setTimeout(() => {
+                        v2.text = '🖤'
+                    }, 100);
+                }, 100);
+            }, 100);
+        }, 100);
+    }
+}
