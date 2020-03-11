@@ -18,11 +18,14 @@ const mouse = {
 
 let enemy1 = []
 let enemy1Face = '🤢'
+let enemy2Face = '😷'
+let enemy3Face = '😈'
 let enemy1X = ((canvas.width / 2) / 2) / 2
 let enemy1Y = 30
 let enemy1Fontsize = 32
 let dx = 2
 let enemyMoveDistanceY = 2
+let eBullets= []
 let bullets = []
 let txt = 'hello'
 let player1 = '🗻'
@@ -234,7 +237,33 @@ for (let i = 0; i < 10; i++) {
         console.log(enemy1);
         enemy1.push(new TextC(enemy1Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
     }
-
+}
+for (let i = 0; i < 10; i++) {
+    if (i == 0) {
+        enemy1Y = enemy1[0].y + enemy1Fontsize + 10
+        enemy1.push(new TextC(enemy2Face, enemy1X, enemy1Y, enemy1Fontsize))
+    } else {
+        console.log(enemy1);
+        enemy1.push(new TextC(enemy2Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
+    }
+}
+for (let i = 0; i < 10; i++) {
+    if (i == 0) {
+        enemy1Y = enemy1[10].y + enemy1Fontsize + 10
+        enemy1.push(new TextC(enemy2Face, enemy1X, enemy1Y, enemy1Fontsize))
+    } else {
+        console.log(enemy1);
+        enemy1.push(new TextC(enemy2Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
+    }
+}
+for (let i = 0; i < 10; i++) {
+    if (i == 0) {
+        enemy1Y = enemy1[20].y + enemy1Fontsize + 10
+        enemy1.push(new TextC(enemy3Face, enemy1X, enemy1Y, enemy1Fontsize))
+    } else {
+        console.log(enemy1);
+        enemy1.push(new TextC(enemy3Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
+    }
 }
 
 // Draw [END]
@@ -254,8 +283,8 @@ setInterval(() => {
         v.x += dx
         if (v.x + dx + 45 > canvas.width || v.x + dx <= 0) {
             dx = -dx;
-            if (i == 0) {
-                v.x += dx * 2
+            if (i == 0 || i == 10 || i == 20) {
+                v.x += dx * 1.5
             }
             enemy1.forEach((v, i) => {
                 v.y += 7
@@ -264,8 +293,20 @@ setInterval(() => {
                 }
             })
         }
+        
         v.draw()
     })
+
+
+    eBullets.forEach((v,i) => {
+        v.y += 2
+        v.draw()
+        if (v.y > canvas.height) {
+            eBullets.splice(i,1)
+        }
+    });
+    // console.log(eBullets);
+
 
     bullets.forEach((v, i) => {
         v.y -= 2
@@ -277,7 +318,7 @@ setInterval(() => {
             // distx = v2.x - v.x
             // disty = v2.y - v.y
             // sqaureRoute = sqrt(distx ** 2 + disty ** 2)
-            if (v.x < v2.x + 32 && v.x + v.width > v2.x &&
+            if (v.x < v2.x + 38 && v.x + v.width > v2.x &&
                 v.y < v2.y + 32 && v.y + v.height > v2.y) {
                 console.log('hit');
                 deathAnimation(Math.floor(Math.random() * 5),v2)
@@ -290,6 +331,39 @@ setInterval(() => {
     })
 
 }, 10);
+
+setTimeout(() => {
+    setInterval(() => {
+        let ran2 = Math.floor(Math.random() * enemy1.length)
+        let ran3 = Math.floor(Math.random() * enemy1.length)
+        let ran4 = Math.floor(Math.random() * enemy1.length)
+        let ran5 = Math.floor(Math.random() * enemy1.length)
+        let ran6 = Math.floor(Math.random() * enemy1.length)
+        let ran7 = Math.floor(Math.random() * enemy1.length)
+        console.log(`ran2 : ${ran2}  ran3 ${ran3}`);
+        let e1 = enemy1[ran2]
+        let e2 = enemy1[ran3]
+        let e3 = enemy1[ran4]
+        let e4 = enemy1[ran5]
+        let e5 = enemy1[ran6]
+        let e6 = enemy1[ran7]
+        eShoot(e1)
+        eShoot(e2)
+        setTimeout(() => {
+            eShoot(e3)
+        }, 2000);
+        setTimeout(() => {
+            eShoot(e4)
+        }, 4000);
+        setTimeout(() => {
+            eShoot(e5)
+        }, 6000);
+        setTimeout(() => {
+            eShoot(e6)
+        }, 3000);
+
+    }, 4000);
+}, 4000);
 
 // Animation [END]
 
@@ -408,5 +482,28 @@ function deathAnimation(ran,v2) {
                 }, 100);
             }, 100);
         }, 100);
+    }
+}
+
+function eShoot(eFace) {
+    let oriFace = eFace.text
+    if (eFace.text == '🤢') {
+        eFace.text = '🤮'
+        eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'green'))
+        setTimeout(() => {
+            eFace.text = '🤢'
+        }, 800);
+    } else if (eFace.text == '😷') {
+        eFace.text = '😩'
+        eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'yellow'))
+        setTimeout(() => {
+            eFace.text = '😷'
+        }, 800);
+    } else if (eFace.text == '😈') {
+        eFace.text = '👿'
+        eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'red', 'black'))
+        setTimeout(() => {
+            eFace.text = '😈'
+        }, 800);
     }
 }
