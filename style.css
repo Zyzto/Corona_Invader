@@ -1,0 +1,12 @@
+body{
+    background-color: rgb(187, 187, 187);
+}
+
+#canvas{
+    border: black 4px solid;
+    margin: 0;
+}
+
+* {
+cursor: none;
+}
