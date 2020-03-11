@@ -227,10 +227,6 @@ class TextC {
 
 // Draw [START]
 
-// ctx.beginPath()
-// ctx.font = '64px Georgia'
-// ctx.fillText('hello',mouse.x,mouse.y)
-
 for (let i = 0; i < 10; i++) {
     if (i == 0) {
         enemy1.push(new TextC(enemy1Face, enemy1X, enemy1Y, enemy1Fontsize))
@@ -254,16 +250,18 @@ setInterval(() => {
     ctx.font = '32px Georgia'
     ctx.fillText(player1, mouse.x, canvas.height - 15)
 
-    enemy1.forEach((v,i) => {
+    enemy1.forEach((v, i) => {
         v.x += dx
-        if (v.x + dx +45 > canvas.width || v.x + dx <= 0) {
+        if (v.x + dx + 45 > canvas.width || v.x + dx <= 0) {
             dx = -dx;
             if (i == 0) {
-                v.x += dx*2
+                v.x += dx * 2
             }
-            enemy1.forEach((v,i) => {
+            enemy1.forEach((v, i) => {
                 v.y += 7
-                if(i == 0){v.x +=dx}
+                if (i == 0) {
+                    v.x += dx
+                }
             })
         }
         v.draw()
@@ -275,6 +273,92 @@ setInterval(() => {
         if (v.y < 0) {
             bullets.splice(i, 1)
         }
+        enemy1.forEach((v2, i2) => {
+            // distx = v2.x - v.x
+            // disty = v2.y - v.y
+            // sqaureRoute = sqrt(distx ** 2 + disty ** 2)
+            if (v.x < v2.x + 32 && v.x + v.width > v2.x &&
+                v.y < v2.y + 32 && v.y + v.height > v2.y) {
+                console.log('hit');
+                let ran = Math.floor(Math.random() * 5)
+                if (ran == 0) {
+                    v2.text = '💢'
+                    setTimeout(() => {
+                        v2.text = '🤬'
+                        setTimeout(() => {
+                            v2.text = '💢'
+                            setTimeout(() => {
+                                v2.text = '🤬'
+                                setTimeout(() => {
+                                    v2.text = '💢'
+                                }, 100);
+                            }, 100);
+                        }, 100);
+                    }, 100);
+                } else if (ran == 1) {
+                    v2.text = '🔅'
+                    setTimeout(() => {
+                        v2.text = '🔆'
+                        setTimeout(() => {
+                            v2.text = '🔅'
+                            setTimeout(() => {
+                                v2.text = '🔆'
+                                setTimeout(() => {
+                                    v2.text = '🔅'
+                                }, 100);
+                            }, 100);
+                        }, 100);
+                    }, 100);
+                } else if (ran == 2) {
+                    v2.text = '🔴'
+                    setTimeout(() => {
+                        v2.text = '🔶'
+                        setTimeout(() => {
+                            v2.text = '🔴'
+                            setTimeout(() => {
+                                v2.text = '🔶'
+                                setTimeout(() => {
+                                    v2.text = '🔴'
+                                }, 100);
+                            }, 100);
+                        }, 100);
+                    }, 100);
+                } else if (ran == 3) {
+                    v2.text = '⭕'
+                    setTimeout(() => {
+                        v2.text = '⛔'
+                        setTimeout(() => {
+                            v2.text = '⭕'
+                            setTimeout(() => {
+                                v2.text = '⛔'
+                                setTimeout(() => {
+                                    v2.text = '⭕'
+                                }, 100);
+                            }, 100);
+                        }, 100);
+                    }, 100);
+                } else {
+                    v2.text = '🖤'
+                    setTimeout(() => {
+                        v2.text = '💔'
+                        setTimeout(() => {
+                            v2.text = '🖤'
+                            setTimeout(() => {
+                                v2.text = '💔'
+                                setTimeout(() => {
+                                    v2.text = '🖤'
+                                }, 100);
+                            }, 100);
+                        }, 100);
+                    }, 100);
+                }
+                bullets.splice(i, 1)
+                setTimeout(() => {
+
+                    enemy1.splice(i2, 1)
+                }, 500);
+            }
+        })
     })
 
 }, 10);
@@ -296,6 +380,9 @@ window.addEventListener('resize', () => {
     canvas.width = innerWidth - 25
     canvas.height = innerHeight - 30
     console.log(`Canvas Size : X${canvas.width} Y${canvas.height}`);
+    setTimeout(() => {
+        location.reload()
+    }, 1500);
 })
 
 addEventListener('click', () => {
@@ -312,7 +399,7 @@ addEventListener('click', () => {
         allowClick = false
         setTimeout(() => {
             allowClick = true
-        }, 1000)
+        }, 750)
     } else {
         console.log(`too fast`);
     }
