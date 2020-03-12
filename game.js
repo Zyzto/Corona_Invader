@@ -54,7 +54,6 @@ class RectangleObj {
         fillColor = '', strokeColor = '', strokeWidth = 2
     ) {
         // ensure the arguments passed in are numbers
-        // a bit overkill for this tutorial
         this.x = Number(x)
         this.y = Number(y)
         this.width = Number(width)
@@ -129,78 +128,6 @@ class RectangleObj {
         ctx.restore()
     }
 }
-
-// class TextC {
-//     // you create new Rectangles by calling this as a function
-//     // these are the arguments you pass in
-//     // add default values to avoid errors on empty arguments
-//     constructor(
-//         text = '', x = 0, y = 0,
-//         width = 0, fontsize = 16, fillColor = 'black'
-//     ) {
-//         // ensure the arguments passed in are numbers
-//         this.text = String(text)
-//         this.x = Number(x)
-//         this.y = Number(y)
-//         this.width = Number(width)
-//         this.fontsize = Number(fontsize)
-//         this.fillColor = String(fillColor)
-//     }
-
-//     // get keyword causes this method to be called
-//     get area() {
-//         return this.width
-//     }
-
-//     // gets the X position of the left side
-//     get left() {
-//         // origin is at top left so just return x
-//         return this.x
-//     }
-
-//     // get X position of right side
-//     get right() {
-//         // x is left position + the width to get end point
-//         return this.x + this.width
-//     }
-
-//     // get the Y position of top side
-//     get top() {
-//         // origin is at top left so just return y
-//         return this.y + (this.fontsize / 2)
-//     }
-
-//     // get Y position at bottom
-//     // get bottom() {
-//     //     return this.y + this.height
-//     // }
-
-//     // draw rectangle to screen
-//     draw() {
-//         // destructuring
-//         const {
-//             text,
-//             x,
-//             y,
-//             width,
-//             fillColor,
-//         } = this
-
-//         // saves the current styles set elsewhere
-//         // to avoid overwriting them
-//         ctx.save()
-
-//         // Draw Text
-//         ctx.font = `${this.fontsize}px`
-//         ctx.fillText(text, x, y, width)
-//         ctx.fillStyle = `${fillColor}`
-
-//         // restores the styles from earlier
-//         // preventing the colors used here
-//         // from polluting other drawings
-//         ctx.restore()
-//     }
-// }
 
 class TextC {
 
