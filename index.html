@@ -7,35 +7,45 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body class=".background-animation">
-    <p id="clickMe">Click Anywhere To Play</p>
+    <p id="clickMe" class="slide-in-blurred-bottom">Click Anywhere To Play</p>
     <h1 class="slide-down" class="hovering" id="upperT">Corona Invader</h1>
     <div id="middleT">
       <img
         id="mouseRightI"
         src="img/mouse.png"
-        class="mouse"
-        class="slide-left"
+        class="mouse slide-in-blurred-right"
       />
-      <p id="mouseRightT" class="mouseT" class="slide-right">Move Character Right</p>
+      <p id="mouseRightT" class="mouseT slide-in-blurred-left">
+        Move Character Right
+      </p>
       <img
         id="mouseLeftI"
         src="img/mouse.png"
-        class="mouse"
-        class="slide-left"
+        class="mouse slide-in-blurred-right"
       />
-      <p id="mouseLeftT" class="mouseT" class="slide-right">Move Character Right</p>
+      <p
+        id="mouseLeftT"
+        class="mouseT slide-in-blurred-left"
+      >
+        Move Character Right
+      </p>
       <img
         id="mouseclickI"
         src="img/mouseL.png"
-        class="mouse"
-        class="slide-left"
+        class="mouse slide-in-blurred-right"
       />
-      <p id="mouseclickT" class="mouseT" class="slide-right">Shoot</p>
+      <p
+        id="mouseclickT"
+        class="mouseT slide-in-blurred-left"
+      >
+        Shoot
+      </p>
     </div>
+    <p id="bottomT" class="slide-in-blurred-bottom">By Ziad Alshanbari</p>
     <script>
-        window.addEventListener('click',()=>{
-            window.location.href = '/game.html'
-        })
+      window.addEventListener("click", () => {
+        window.location.href = "/game.html";
+      });
     </script>
   </body>
 </html>
