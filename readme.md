@@ -6,7 +6,8 @@ In a span of 4 days \*(for me it was 2 cause you know laziness)
 
 # The Game
 
-## Corona Invader
+## [Corona Invader](https://pages.git.generalassemb.ly/Zyzto/Corona_Invader/) # click to play
+
 
 This is Space Invader with some styling to resemble the current Corona virus
 
