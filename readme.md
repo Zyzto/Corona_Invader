@@ -36,3 +36,5 @@ You can control the character by moving the mouse sideways and clicking the left
 -[Animations Generator Animista ](https://animista.net)
 
 -[CSS Gradient Text](https://cssgradient.io/blog/css-gradient-text/)
+
+-[CSS Floating](https://codepen.io/MarioDesigns/pen/woJgeo)

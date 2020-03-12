@@ -87,7 +87,8 @@ body {
   -webkit-animation: slide-bottom 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)
     both;
   animation: slide-bottom 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-    MoveUpDown 1.5s linear infinite both;
+    /* MoveUpDown 1.5s linear infinite both; */
+    float 3s ease-in-out infinite;
 }
 @-webkit-keyframes slide-bottom {
   0% {
@@ -164,12 +165,15 @@ body {
 
 #mouseRightI {
   grid-area: mouseRightI;
+  animation: float-right 2s ease-in-out infinite;
 }
 #mouseLeftI {
   grid-area: mouseLeftI;
+  animation: float-left 2s ease-in-out infinite;
 }
 #mouseclickI {
   grid-area: mouseclickI;
+  animation: scale 2s ease-in-out infinite;
 }
 #mouseRightT {
   grid-area: mouseRightT;
@@ -286,7 +290,7 @@ body {
 .slide-in-blurred-left {
 	-webkit-animation: slide-in-blurred-left 0.6s cubic-bezier(0.230, 1.000, 0.320, 1.000) both;
             animation: slide-in-blurred-left 0.6s cubic-bezier(0.230, 1.000, 0.320, 1.000) both,
-            MoveUpDown2 1.5s linear infinite both;
+            float 6s ease-in-out infinite;
 }
 @-webkit-keyframes slide-in-blurred-left {
   0% {
@@ -329,12 +333,49 @@ body {
   }
 }
 
-@keyframes MoveUpDown2 {
-  0%,
-  100% {
-    bottom: 0;
-  }
-  50% {
-    bottom: 10px;
-  }
+@keyframes float {
+	0% {
+		transform: translatey(0px);
+	}
+	50% {
+		transform: translatey(-20px);
+	}
+	100% {
+		transform: translatey(0px);
+	}
+}
+
+@keyframes float-right {
+	0% {
+		transform: translateX(0px)
+	}
+	50% {
+		transform: translateX(20px)
+	}
+	100% {
+		transform: translateX(0px)
+	}
+}
+@keyframes float-left {
+	0% {
+		transform: translateX(0px)
+	}
+	50% {
+		transform: translateX(-20px)
+	}
+	100% {
+		transform: translateX(0px)
+	}
+}
+
+@keyframes scale {
+	0% {
+		transform: scale(1)
+	}
+	50% {
+		transform: scale(0.8)
+	}
+	100% {
+		transform: scale(1)
+	}
 }
