@@ -26,8 +26,13 @@ You can control the character by moving the mouse sideways and clicking the left
 ## Resources 
 
 -[Emoji site](https://html-css-js.com/html/character-codes/)
+
 -[Creating and Drawing on an HTML5 Canvas using JavaScript](https://codeburst.io/creating-and-drawing-on-an-html5-canvas-using-javascript-93da75f001c1)
+
 -[Mozilla Collision detection in Canvas](https://developer.mozilla.org/en-US/docs/Games/Tutorials/2D_Breakout_game_pure_JavaScript/Collision_detection)
+
 -[Mozilla 2D breakout game using pure JavaScript](https://developer.mozilla.org/en-US/docs/Games/Tutorials/2D_Breakout_game_pure_JavaScript)
+
 -[Animations Generator Animista ](https://animista.net)
+
 -[CSS Gradient Text](https://cssgradient.io/blog/css-gradient-text/)
