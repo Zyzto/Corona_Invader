@@ -25,14 +25,16 @@ let enemy1Y = 80
 let enemy1Fontsize = 32
 let dx = 2
 let enemyMoveDistanceY = 2
-let eBullets= []
+let eBullets = []
 let bullets = []
 let txt = 'hello'
 let player1 = '🗻'
 let life = 3
 let lifeIcon = '🖤'
 let lifeCheck = true
-let allowClick = true;
+let allowClick = true
+let textCheck = false
+let text = ''
 
 
 // let newT = new TextC(txt, 50, mouse.y, 0, 64, 'red')
@@ -237,7 +239,7 @@ for (let i = 0; i < 10; i++) {
     if (i == 0) {
         enemy1.push(new TextC(enemy1Face, enemy1X, enemy1Y, enemy1Fontsize))
     } else {
-        console.log(enemy1);
+        // console.log(enemy1);
         enemy1.push(new TextC(enemy1Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
     }
 }
@@ -246,7 +248,7 @@ for (let i = 0; i < 10; i++) {
         enemy1Y = enemy1[0].y + enemy1Fontsize + 10
         enemy1.push(new TextC(enemy2Face, enemy1X, enemy1Y, enemy1Fontsize))
     } else {
-        console.log(enemy1);
+        // console.log(enemy1);
         enemy1.push(new TextC(enemy2Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
     }
 }
@@ -255,7 +257,7 @@ for (let i = 0; i < 10; i++) {
         enemy1Y = enemy1[10].y + enemy1Fontsize + 10
         enemy1.push(new TextC(enemy2Face, enemy1X, enemy1Y, enemy1Fontsize))
     } else {
-        console.log(enemy1);
+        // console.log(enemy1);
         enemy1.push(new TextC(enemy2Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
     }
 }
@@ -264,7 +266,7 @@ for (let i = 0; i < 10; i++) {
         enemy1Y = enemy1[20].y + enemy1Fontsize + 10
         enemy1.push(new TextC(enemy3Face, enemy1X, enemy1Y, enemy1Fontsize))
     } else {
-        console.log(enemy1);
+        // console.log(enemy1);
         enemy1.push(new TextC(enemy3Face, enemy1[i - 1].x + enemy1Fontsize + 10, enemy1Y, enemy1Fontsize))
     }
 }
@@ -279,7 +281,7 @@ setInterval(() => {
     // Clear canvas [END]
 
     ctx.font = '64px'
-    ctx.fillText(`${lifeIcon.repeat(life)}`, 15, 40)
+    if (life !== 0) ctx.fillText(`${lifeIcon.repeat(life)}`, 15, 40)
 
     ctx.font = '32px Georgia'
     ctx.fillText(player1, mouse.x, canvas.height - 15)
@@ -288,7 +290,7 @@ setInterval(() => {
         v.x += dx
         if (v.x + dx + 45 > canvas.width || v.x + dx <= 0) {
             dx = -dx;
-            if (i == 0 || i == 10 || i == 20) {
+            if (i == 0 || i == 10 || i == 20 || i == 19 || i == 9) {
                 v.x += dx * 1.5
             }
             enemy1.forEach((v, i) => {
@@ -297,17 +299,25 @@ setInterval(() => {
                     v.x += dx
                 }
             })
+            if (v.y >= canvas.height - 30) {
+                console.log('lost');
+                endGame(enemy1, player1.text, false)
+            }
         }
-        
+
         v.draw()
     })
 
+    if (textCheck) {
+        ctx.font = '168px'
+        ctx.fillText(text, (canvas.width / 2) - 200, canvas.height / 2)
+    }
 
-    eBullets.forEach((v,i) => {
+    eBullets.forEach((v, i) => {
         v.y += 2
         v.draw()
         if (v.y > canvas.height) {
-            eBullets.splice(i,1)
+            eBullets.splice(i, 1)
         }
         if (v.x < mouse.x + 38 && v.x + v.width > mouse.x &&
             v.y < canvas.height - 20 && v.y + v.height > canvas.height - 20) {
@@ -336,7 +346,8 @@ setInterval(() => {
                 }, 1500);
             }
             if (life <= 0) {
-                location.reload()
+                player1 = ''
+                endGame(enemy1, player1.text, false)
             }
         }
     });
@@ -356,12 +367,14 @@ setInterval(() => {
             if (v.x < v2.x + 38 && v.x + v.width > v2.x &&
                 v.y < v2.y + 32 && v.y + v.height > v2.y) {
                 console.log('hit');
-                deathAnimation(Math.floor(Math.random() * 5),v2)
+                deathAnimation(Math.floor(Math.random() * 5), v2)
                 bullets.splice(i, 1)
                 setTimeout(() => {
                     enemy1.splice(i2, 1)
                 }, 500);
             }
+            // enemy1.length == 0 ? endGame(enemy1, player1.text, true) : null
+            // console.log(enemy1.length);
         })
     })
 
@@ -375,7 +388,7 @@ setTimeout(() => {
         let ran5 = Math.floor(Math.random() * enemy1.length)
         let ran6 = Math.floor(Math.random() * enemy1.length)
         let ran7 = Math.floor(Math.random() * enemy1.length)
-        console.log(`ran2 : ${ran2}  ran3 ${ran3}`);
+        // console.log(`ran2 : ${ran2}  ran3 ${ran3}`);
         let e1 = enemy1[ran2]
         let e2 = enemy1[ran3]
         let e3 = enemy1[ran4]
@@ -399,6 +412,12 @@ setTimeout(() => {
 
     }, 4000);
 }, 4000);
+
+setInterval(() => {
+    if (enemy1.length <= 0) {
+        endGame(enemy1, player1.text, true)
+    }
+}, 5000);
 
 // Animation [END]
 
@@ -431,12 +450,12 @@ addEventListener('click', () => {
             player1 = '🗻'
         }, 200)
 
-        console.log(bullets);
+        // console.log(bullets);
 
         allowClick = false
         setTimeout(() => {
             allowClick = true
-        }, 750)
+        }, 500)
     } else {
         console.log(`too fast`);
     }
@@ -446,7 +465,7 @@ addEventListener('click', () => {
 
 // functions [START]
 
-function deathAnimation(ran,v2) {
+function deathAnimation(ran, v2) {
     if (ran == 0) {
         v2.text = '💢'
         setTimeout(() => {
@@ -521,7 +540,7 @@ function deathAnimation(ran,v2) {
 }
 
 function eShoot(eFace) {
-    if (!eFace == undefined || !eFace == null) {
+    if (eFace != undefined) {
         if (eFace.text == '🤢') {
             eFace.text = '🤮'
             eBullets.push(new RectangleObj(eFace.x, eFace.y, 10, 10, 'green'))
@@ -541,5 +560,24 @@ function eShoot(eFace) {
                 eFace.text = '😈'
             }, 800);
         }
+    }
+}
+
+function endGame(arr1, player1, Victory) {
+    if (Victory) {
+        arr1 = []
+        text = 'Winner Winner No Chicken Thou'
+        textCheck = true
+        setTimeout(() => {
+            location.reload()
+        }, 10000);
+    } else {
+        arr1.splice(0, arr1.length)
+        arr1.push(new RectangleObj(0,0,0,0))
+        text = 'I guess YOU LOST! HA'
+        textCheck = true
+        setTimeout(() => {
+            location.reload()
+        }, 10000);
     }
 }
