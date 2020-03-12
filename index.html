@@ -1,13 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game By Ziad Alshanbari</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <canvas id="canvas"></canvas>
-    <script src="game.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Corona Invader</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class=".background-animation">
+    <p id="clickMe">Click Anywhere To Play</p>
+    <h1 class="slide-down" class="hovering" id="upperT">Corona Invader</h1>
+    <div id="middleT">
+      <img
+        id="mouseRightI"
+        src="img/mouse.png"
+        class="mouse"
+        class="slide-left"
+      />
+      <p id="mouseRightT" class="mouseT" class="slide-right">Move Character Right</p>
+      <img
+        id="mouseLeftI"
+        src="img/mouse.png"
+        class="mouse"
+        class="slide-left"
+      />
+      <p id="mouseLeftT" class="mouseT" class="slide-right">Move Character Right</p>
+      <img
+        id="mouseclickI"
+        src="img/mouseL.png"
+        class="mouse"
+        class="slide-left"
+      />
+      <p id="mouseclickT" class="mouseT" class="slide-right">Shoot</p>
+    </div>
+    <script>
+        window.addEventListener('click',()=>{
+            window.location.href = '/game.html'
+        })
+    </script>
+  </body>
 </html>

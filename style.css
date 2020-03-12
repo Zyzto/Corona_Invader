@@ -1,12 +1,195 @@
-body{
-    background-color: rgb(187, 187, 187);
+body {
+  /* background-color: rgb(187, 187, 187); */
+  text-align: center;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 0.5fr 2fr 0.5fr;
+  grid-template-areas:
+    "upperT"
+    "middleT"
+    "bottomT";
+
+  margin: auto;
+  height: 100vh;
+
+  background: linear-gradient(270deg, #9bb42e, #1eb47b, #28a0e4);
+  background-size: 600% 600%;
+
+  -webkit-animation: background-animation 21s ease infinite;
+  -moz-animation: background-animation 21s ease infinite;
+  animation: background-animation 21s ease infinite;
 }
 
-#canvas{
-    border: black 4px solid;
-    margin: 0;
+@-webkit-keyframes background-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+@-moz-keyframes background-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+@keyframes background-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
-* {
-cursor: none;
+#upperT {
+  position: relative;
+  /* top: -250px; */
+  /* display: flex; */
+  grid-area: upperT;
+  font-size: 128px;
+  /* align-content: center; */
+  /* justify-content: center; */
+}
+
+.slide-down {
+  background: -webkit-linear-gradient(green, lightgreen);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke-width: 2px;
+  -webkit-text-stroke-color: black;
+
+  -webkit-animation: slide-bottom 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+    both;
+  animation: slide-bottom 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    MoveUpDown 1.5s linear infinite both;
+}
+@-webkit-keyframes slide-bottom {
+  0% {
+    -webkit-transform: translateY(-250px);
+    transform: translateY(-250px);
+  }
+  100% {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+  }
+}
+@keyframes slide-bottom {
+  0% {
+    -webkit-transform: translateY(-250px);
+    transform: translateY(-250px);
+  }
+  100% {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+  }
+}
+
+@keyframes MoveUpDown {
+  0%,
+  100% {
+    bottom: 0;
+  }
+  50% {
+    bottom: 10px;
+  }
+}
+
+#clickMe{
+    color: white;
+    opacity: 0.7;
+    font-size: 24px;
+}
+
+#middleT {
+  text-align: center;
+  padding: auto;
+  justify-content: center;
+  align-content: center;
+  grid-area: middleT;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  grid-template-areas:
+    "mouseRightT mouseRightI"
+    "mouseLeftT mouseLeftI"
+    "mouseclickT mouseclickI";
+}
+
+.mouse {
+  width: 50px;
+  background-color: rgba(255, 255, 255, 0);
+  opacity: 0.5;
+  align-self: center;
+  justify-self: center;
+}
+.mouseT {
+  align-self: center;
+  justify-self: center;
+  opacity: 0.8;
+  font-size: 32px;
+  font-weight: 800;
+  font-family: monospace;
+  background: -webkit-linear-gradient(yellow, lightgreen);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke-width: 1px;
+  -webkit-text-stroke-color: black;
+}
+
+#mouseRightI {
+  grid-area: mouseRightI;
+}
+#mouseLeftI {
+  grid-area: mouseLeftI;
+}
+#mouseclickI {
+  grid-area: mouseclickI;
+}
+#mouseRightT {
+  grid-area: mouseRightT;
+}
+#mouseLeftT {
+  grid-area: mouseLeftT;
+}
+#mouseclickT {
+  grid-area: mouseclickT;
+}
+
+.slide-right {
+	-webkit-animation: slide-right 1s cubic-bezier(0.175, 0.885, 0.320, 1.275) both;
+            animation: slide-right 1s cubic-bezier(0.175, 0.885, 0.320, 1.275) both,
+            MoveUpDown 1.5s linear infinite both;
+}
+@-webkit-keyframes slide-right {
+  0% {
+    -webkit-transform: translateX(-999px);
+            transform: translateX(-999px);
+  }
+  100% {
+    -webkit-transform: translateX(0);
+            transform: translateX(0);
+  }
+}
+@keyframes slide-right {
+  0% {
+    -webkit-transform: translateX(-999px);
+            transform: translateX(-999px);
+  }
+  100% {
+    -webkit-transform: translateX(0);
+            transform: translateX(0);
+  }
 }
