@@ -1,4 +1,4 @@
-# Porject #1
+# Project #1
 
 Build A Game !
 This project is about building a game in **HTML/CSS/JS**
