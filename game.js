@@ -282,7 +282,7 @@ setInterval(() => {
 
 
     bullets.forEach((v, i) => {
-        v.y -= 2
+        v.y -= 4
         v.draw()
         if (v.y < 0) {
             bullets.splice(i, 1)
