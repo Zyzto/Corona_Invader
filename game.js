@@ -282,7 +282,7 @@ setInterval(() => {
 
 
     bullets.forEach((v, i) => {
-        v.y -= 4
+        v.y -= 5
         v.draw()
         if (v.y < 0) {
             bullets.splice(i, 1)
@@ -382,7 +382,7 @@ addEventListener('click', () => {
         allowClick = false
         setTimeout(() => {
             allowClick = true
-        }, 500)
+        }, 350)
     } else {
         console.log(`too fast`);
     }
