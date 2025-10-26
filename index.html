@@ -4,16 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Corona Invader</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body class=".background-animation">
+  <body>
     <p id="clickMe" class="slide-in-blurred-bottom">Click Anywhere To Play</p>
-    <h1 class="slide-down" class="hovering" id="upperT">Corona Invader</h1>
+    <h1 class="slide-down" id="upperT">Corona Invader</h1>
     <div id="middleT">
       <img
         id="mouseRightI"
         src="img/mouse.png"
         class="mouse slide-in-blurred-right"
+        alt="Mouse Right"
       />
       <p id="mouseRightT" class="mouseT slide-in-blurred-left">
         Move Character Right
@@ -22,6 +24,7 @@
         id="mouseLeftI"
         src="img/mouse.png"
         class="mouse slide-in-blurred-right"
+        alt="Mouse Left"
       />
       <p id="mouseLeftT" class="mouseT slide-in-blurred-left">
         Move Character Left
@@ -30,15 +33,18 @@
         id="mouseclickI"
         src="img/mouseL.png"
         class="mouse slide-in-blurred-right"
+        alt="Mouse Click"
       />
       <p id="mouseclickT" class="mouseT slide-in-blurred-left">
         Shoot
       </p>
     </div>
-    <p id="bottomT" class="slide-in-blurred-bottom">By Ziad Alshanbari</p>
+    <div id="bottomT">
+      <p class="slide-in-blurred-bottom">By Ziad Alshanbari</p>
+    </div>
     <script>
       window.addEventListener("click", () => {
-        window.location.href = "/Corona_Invader/game.html";
+        window.location.href = "game.html";
       });
     </script>
   </body>
