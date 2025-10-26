@@ -1381,8 +1381,10 @@ const advanceLevel = () => {
   
   gameState.level++;
   
+  // Check if we've completed all levels
   if (gameState.level > gameState.maxLevel) {
-    // Final victory!
+    // Final victory! (only if we completed level 6, the boss)
+    console.log('Victory! Completed level:', gameState.level - 1, 'Max level:', gameState.maxLevel);
     endGame(true);
     return;
   }
@@ -1404,12 +1406,14 @@ const checkLevelComplete = () => {
   if (gameState.isBossLevel) {
     // Boss defeated
     if (gameState.boss && gameState.boss.health <= 0) {
+      console.log('Boss defeated! Current level:', gameState.level);
       gameState.boss = null;
       advanceLevel();
     }
   } else {
     // All enemies cleared
     if (gameState.enemies.length === 0 && !gameState.levelComplete) {
+      console.log('Level complete! Current level:', gameState.level, 'Enemies left:', gameState.enemies.length);
       advanceLevel();
     }
   }
