@@ -1379,15 +1379,18 @@ const advanceLevel = () => {
   if (gameState.levelComplete) return; // Prevent multiple calls
   gameState.levelComplete = true;
   
-  gameState.level++;
+  const nextLevel = gameState.level + 1;
   
-  // Check if we've completed all levels
-  if (gameState.level > gameState.maxLevel) {
+  // Check if we've completed all levels (next level would be level 7, which doesn't exist)
+  if (nextLevel > gameState.maxLevel) {
     // Final victory! (only if we completed level 6, the boss)
-    console.log('Victory! Completed level:', gameState.level - 1, 'Max level:', gameState.maxLevel);
+    console.log('Victory! Completed level:', gameState.level, 'Max level:', gameState.maxLevel);
     endGame(true);
     return;
   }
+  
+  // Advance to next level
+  gameState.level = nextLevel;
   
   // Show transition message
   showLevelTransition(gameState.level);
@@ -1401,7 +1404,7 @@ const advanceLevel = () => {
 
 const checkLevelComplete = () => {
   // Prevent multiple calls during level transition
-  if (gameState.levelComplete || gameState.isGameOver) return;
+  if (gameState.levelComplete || gameState.isGameOver || gameState.isRunning === false) return;
   
   if (gameState.isBossLevel) {
     // Boss defeated
@@ -1411,9 +1414,13 @@ const checkLevelComplete = () => {
       advanceLevel();
     }
   } else {
-    // All enemies cleared
-    if (gameState.enemies.length === 0 && !gameState.levelComplete) {
-      console.log('Level complete! Current level:', gameState.level, 'Enemies left:', gameState.enemies.length);
+    // All enemies cleared - must be completely removed from array
+    const aliveEnemies = gameState.enemies.filter(e => !e.isDying && e.deathAnimation == null);
+    
+    console.log('Checking level complete. Total enemies:', gameState.enemies.length, 'Alive:', aliveEnemies.length);
+    
+    if (gameState.enemies.length === 0) {
+      console.log('Level complete! Current level:', gameState.level);
       advanceLevel();
     }
   }
@@ -1501,19 +1508,23 @@ const handleEnemyHit = (bulletIndex, enemyIndex) => {
   // Spawn powerup randomly
   spawnPowerup(enemy.x, enemy.y);
 
-  enemy.startDeathAnimation();
-  // Don't remove bullet here - it's removed in the game loop after collision
-
+  // Mark enemy as dying
+  enemy.isDying = true;
+  enemy.deathStartTime = Date.now();
+  
+  // Remove enemy after animation
   setTimeout(() => {
     const currentIndex = gameState.enemies.indexOf(enemy);
     if (currentIndex !== -1) {
       gameState.enemies.splice(currentIndex, 1);
+      console.log('Enemy removed. Remaining:', gameState.enemies.length);
+      
       // Check if level is complete after enemy is removed
       setTimeout(() => {
         checkLevelComplete();
-      }, 100);
+      }, 50);
     }
-  }, enemy.deathDuration);
+  }, enemy.deathDuration || 500);
 };
 
 const enemyShoot = (enemy) => {
@@ -2104,9 +2115,8 @@ const gameLoop = (currentTime) => {
     }
   }
 
-  if (gameState.enemies.length === 0 && gameState.isRunning) {
-    endGame(true);
-  }
+  // Victory condition now handled by checkLevelComplete() which calls advanceLevel()
+  // This old victory check is no longer needed
 };
 
 // Global restart function
@@ -2279,6 +2289,20 @@ const clearAllParticles = () => {
   gameState.player.trailParticles = [];
 };
 
+const killAllEnemies = () => {
+  console.log('DEBUG: Killing all enemies');
+  gameState.enemies.forEach(enemy => {
+    enemy.isDying = true;
+    enemy.startDeathAnimation();
+  });
+  
+  // Clear enemies array immediately for testing
+  gameState.enemies = [];
+  
+  // Check level complete
+  checkLevelComplete();
+};
+
 // Setup debug checkboxes
 if (DEBUG_MODE) {
   document.addEventListener('DOMContentLoaded', () => {
@@ -2298,11 +2322,14 @@ if (DEBUG_MODE) {
         }
       });
 
-      // Add keyboard shortcut (F1 to toggle debug panel)
+      // Add keyboard shortcut (F1 to toggle debug panel, K to kill all enemies)
       window.addEventListener('keydown', (e) => {
         if (e.key === 'F1') {
           e.preventDefault();
           toggleDebugPanel();
+        }
+        if (e.key === 'k' || e.key === 'K') {
+          killAllEnemies();
         }
       });
     }, 100);
