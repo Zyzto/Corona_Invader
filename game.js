@@ -1398,6 +1398,9 @@ const advanceLevel = () => {
 };
 
 const checkLevelComplete = () => {
+  // Prevent multiple calls during level transition
+  if (gameState.levelComplete || gameState.isGameOver) return;
+  
   if (gameState.isBossLevel) {
     // Boss defeated
     if (gameState.boss && gameState.boss.health <= 0) {
@@ -1406,7 +1409,7 @@ const checkLevelComplete = () => {
     }
   } else {
     // All enemies cleared
-    if (gameState.enemies.length === 0) {
+    if (gameState.enemies.length === 0 && !gameState.levelComplete) {
       advanceLevel();
     }
   }
@@ -1501,8 +1504,10 @@ const handleEnemyHit = (bulletIndex, enemyIndex) => {
     const currentIndex = gameState.enemies.indexOf(enemy);
     if (currentIndex !== -1) {
       gameState.enemies.splice(currentIndex, 1);
-      // Check if level is complete
-      checkLevelComplete();
+      // Check if level is complete after enemy is removed
+      setTimeout(() => {
+        checkLevelComplete();
+      }, 100);
     }
   }, enemy.deathDuration);
 };
