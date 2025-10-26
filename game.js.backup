@@ -1,0 +1,1997 @@
+// Corona Invader Game - Refactored Version
+// Canvas initialization
+const canvas = document.querySelector('#canvas');
+const ctx = canvas.getContext('2d');
+
+// Canvas Settings
+canvas.width = Math.min(window.innerWidth - 60, 1200); // Max width for better gameplay
+canvas.height = Math.min(window.innerHeight - 20, 1000); // Much taller canvas for maximum vertical space
+
+// Mobile Detection
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           ('ontouchstart' in window) || 
+           (navigator.maxTouchPoints > 0);
+}
+
+// Initialize mobile controls
+function initializeMobileControls() {
+    if (!isMobileDevice()) return;
+    
+    const mobileControls = document.getElementById('mobile-controls');
+    if (mobileControls) {
+        mobileControls.classList.add('show');
+        
+        // Add touch event listeners
+        document.getElementById('mobile-left').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys.left = true;
+            gameState.keys.a = true;
+        });
+        
+        document.getElementById('mobile-left').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys.left = false;
+            gameState.keys.a = false;
+        });
+        
+        document.getElementById('mobile-right').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys.right = true;
+            gameState.keys.d = true;
+        });
+        
+        document.getElementById('mobile-right').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys.right = false;
+            gameState.keys.d = false;
+        });
+        
+        document.getElementById('mobile-up').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys.up = true;
+            gameState.keys.w = true;
+        });
+        
+        document.getElementById('mobile-up').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys.up = false;
+            gameState.keys.w = false;
+        });
+        
+        document.getElementById('mobile-down').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys.down = true;
+            gameState.keys.s = true;
+        });
+        
+        document.getElementById('mobile-down').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys.down = false;
+            gameState.keys.s = false;
+        });
+        
+        document.getElementById('mobile-shoot').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            gameState.keys.space = true;
+        });
+        
+        document.getElementById('mobile-shoot').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            gameState.keys.space = false;
+        });
+    }
+}
+
+// Game Configuration Constants
+const CONFIG = {
+    FRAME_RATE: 16, // ~60 FPS
+    PLAYER_COOLDOWN: 350,
+    ENEMY_SHOOT_INTERVAL: 4000,
+    ENEMY_SHOOT_DELAY: 2000,
+    BULLET_SPEED_PLAYER_BASE: 12,
+    BULLET_SPEED_ENEMY_BASE: 6,
+    BULLET_SPEED_PLAYER_MAX: 20,
+    BULLET_SPEED_ENEMY_MAX: 12,
+    ENEMY_MOVE_SPEED: 2,
+    ENEMY_MOVE_DOWN: 7,
+    ENEMY_FONT_SIZE: 36,
+    ENEMY_ROWS: 4,
+    ENEMY_COLS: 10,
+    ENEMY_SPACING_X: 46,
+    ENEMY_SPACING_Y: 46,
+    INVULNERABILITY_TIME: 1500,
+    DEATH_ANIMATION_DURATION: 500,
+    DEATH_ANIMATION_VARIANTS: {
+        EXPLOSION: 'explosion',
+        FADE_OUT: 'fade_out', 
+        SHRINK: 'shrink',
+        BOUNCE: 'bounce'
+    },
+    SHOOT_ANIMATION_DURATION: 800,
+    BLINK_DURATION: 100,
+    GAME_OVER_DELAY: 10000,
+    RESIZE_RELOAD_DELAY: 1500,
+    SPEED_INCREASE_INTERVAL: 10000, // Speed increases every 10 seconds
+    SPEED_INCREASE_RATE: 0.2, // 20% increase per interval
+    PLAYER_MOVE_SPEED: 8, // Keyboard movement speed
+    PLAYER_BOUNDARY_MARGIN: 20, // Distance from screen edges
+    
+    // Scoring System
+    SCORING: {
+        ENEMY_POINTS: {
+            '🤢': 10,  // Basic enemy
+            '😷': 20,  // Medium enemy  
+            '😈': 50   // Boss enemy
+        },
+        COMBO_MULTIPLIER: 1.5, // 50% bonus for combos
+        COMBO_TIMEOUT: 2000,   // 2 seconds between kills for combo
+        BONUS_POINTS: {
+            PERFECT_SHOT: 5,    // Bonus for hitting without missing
+            SPEED_BONUS: 10,    // Bonus for fast kills
+            SURVIVAL_BONUS: 25  // Bonus for surviving waves
+        }
+    },
+    
+    // Background Configuration
+    BACKGROUND: {
+        STAR_COUNT: 200,
+        NEBULA_COUNT: 12,
+        STAR_SPEED: 0.8,
+        NEBULA_SPEED: 0.3,
+        STAR_SIZE_MIN: 0.5,
+        STAR_SIZE_MAX: 4,
+        NEBULA_SIZE_MIN: 80,
+        NEBULA_SIZE_MAX: 300,
+        PLANET_COUNT: 3,
+        PLANET_SPEED: 0.1
+    },
+    
+    // Enhanced Enemy Movement Configuration
+    ENEMY_MOVEMENT: {
+        BASE_SPEED: 1.5,
+        SPEED_VARIANCE: 0.5, // Random speed variation
+        FORMATION_SPEED_MULTIPLIER: 1.2, // Faster when in formation
+        SCATTER_SPEED_MULTIPLIER: 1.8, // Faster when scattering
+        ADVANCE_SPEED: 8, // Speed when advancing down
+        FORMATION_THRESHOLD: 0.7, // When to maintain formation vs scatter
+        MOVEMENT_PATTERNS: {
+            FORMATION: 'formation', // Maintain tight formation
+            SCATTER: 'scatter', // Individual movement
+            ADVANCE: 'advance', // Move down aggressively
+            RETREAT: 'retreat' // Move back up
+        }
+    }
+};
+
+// Game State Management
+const gameState = {
+    // Player state
+    player: {
+    x: innerWidth / 2,
+        y: innerHeight - 15,
+        lives: 3,
+        isInvulnerable: false,
+        canShoot: true,
+        sprite: '🗻',
+        shootSprite: '🌋'
+    },
+    
+    // Enemy state
+    enemies: [],
+    enemyDirection: 1,
+    enemyMoveDown: false,
+    enemyMovementState: {
+        currentPattern: 'formation',
+        formationIntegrity: 1.0, // 1.0 = perfect formation, 0.0 = scattered
+        lastDirectionChange: 0,
+        advanceTimer: 0,
+        scatterTimer: 0,
+        speedMultiplier: 1.0
+    },
+    
+    // Bullet state
+    playerBullets: [],
+    enemyBullets: [],
+    
+    // Game flow state
+    isRunning: true,
+    isGameOver: false,
+    victory: false,
+    
+    // Speed curve state
+    gameStartTime: Date.now(),
+    currentSpeedMultiplier: 1.0,
+    
+    // UI state
+    showGameOverText: false,
+    gameOverText: '',
+    
+    // Mouse state
+    mouse: {
+        x: innerWidth / 2,
+        y: innerHeight / 2
+    },
+    
+    // Keyboard input state
+    keys: {
+        left: false,
+        right: false,
+        up: false,
+        down: false,
+        space: false,
+        w: false,
+        a: false,
+        s: false,
+        d: false
+    },
+    
+    // HUD elements
+    hudElements: {
+        scoreDisplay: null,
+        levelDisplay: null,
+        livesDisplay: null,
+        gameOverScreen: null,
+        gameOverTitle: null,
+        finalScore: null
+    },
+    
+    // Background elements
+    background: {
+        stars: [],
+        nebulas: [],
+        planets: [],
+        initialized: false
+    },
+    
+    // Scoring system
+    scoring: {
+        score: 0,
+        comboCount: 0,
+        lastKillTime: 0,
+        totalKills: 0,
+        perfectShots: 0,
+        scoreTexts: [] // Floating score texts
+    }
+};
+
+// Enemy types configuration with attack patterns
+const ENEMY_TYPES = [
+    { 
+        face: '🤢', 
+        shootFace: '🤮', 
+        bulletColor: 'green',
+        bulletShape: 'circle',
+        patterns: ['single', 'line', 'spread'],
+        patternWeights: [0.5, 0.3, 0.2],
+        deathFrames: ['🤢', '💥', '🔥', '💨', '✨', '💫']
+    },
+    { 
+        face: '😷', 
+        shootFace: '😩', 
+        bulletColor: 'yellow',
+        bulletShape: 'square',
+        patterns: ['single', 'triple', 'burst'],
+        patternWeights: [0.4, 0.4, 0.2],
+        deathFrames: ['😷', '💥', '⚡', '💢', '✨', '🌟']
+    },
+    { 
+        face: '😈', 
+        shootFace: '👿', 
+        bulletColor: 'red', 
+        bulletStroke: 'black',
+        bulletShape: 'diamond',
+        patterns: ['single', 'tracking', 'wall', 'spiral', 'zigzag'],
+        patternWeights: [0.2, 0.25, 0.2, 0.2, 0.15],
+        deathFrames: ['😈', '💥', '🔥', '💀', '⚡', '☠️', '✨']
+    }
+];
+
+// Death animation frames
+const DEATH_ANIMATIONS = [
+    ['💢', '🤬'],
+    ['🔅', '🔆'],
+    ['🔴', '🔶'],
+    ['⭕', '⛔'],
+    ['🖤', '💔']
+];
+
+// Classes
+class RectangleObj {
+    constructor(x = 0, y = 0, width = 0, height = 0, fillColor = '', strokeColor = '', strokeWidth = 2) {
+        this.x = Number(x);
+        this.y = Number(y);
+        this.width = Number(width);
+        this.height = Number(height);
+        this.fillColor = fillColor;
+        this.strokeColor = strokeColor;
+        this.strokeWidth = strokeWidth;
+    }
+
+    get area() {
+        return this.width * this.height;
+    }
+
+    get left() {
+        return this.x;
+    }
+
+    get right() {
+        return this.x + this.width;
+    }
+
+    get top() {
+        return this.y;
+    }
+
+    get bottom() {
+        return this.y + this.height;
+    }
+
+    draw() {
+        const { x, y, width, height, fillColor, strokeColor, strokeWidth } = this;
+
+        ctx.save();
+        ctx.fillStyle = fillColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.beginPath();
+        ctx.strokeStyle = strokeColor;
+        ctx.rect(x, y, width, height);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class TextC {
+    constructor(text = '', x = 0, y = 0, fontSize = 0) {
+        this.text = text;
+        this.x = Number(x);
+        this.y = Number(y);
+        this.fontSize = Number(fontSize);
+        this.isDying = false;
+        this.deathAnimation = null;
+        this.deathStartTime = 0;
+        this.deathDuration = 500; // 500ms death animation
+        this.originalText = text;
+        this.scale = 1.0;
+        this.rotation = 0;
+        this.alpha = 1.0;
+        this.deathX = 0; // Position where death animation should occur
+        this.deathY = 0; // Position where death animation should occur
+        this.deathVariant = 'explosion'; // Default death animation variant
+        this.bounceVelocity = 0; // For bounce animation
+        this.explosionParticles = []; // For explosion animation
+    }
+
+    draw() {
+        if (this.isDying) {
+            this.drawDeathAnimation();
+        } else {
+            this.drawNormal();
+        }
+    }
+
+    drawNormal() {
+        const { text, x, y, fontSize } = this;
+        ctx.font = `${fontSize}px`;
+        ctx.fillText(text, x, y);
+    }
+
+    drawDeathAnimation() {
+        const currentTime = Date.now();
+        const elapsed = currentTime - this.deathStartTime;
+        const progress = Math.min(elapsed / this.deathDuration, 1.0);
+        
+        ctx.save();
+        
+        // Apply transformations based on animation variant
+        switch (this.deathVariant) {
+            case 'explosion':
+                this.drawExplosionAnimation(progress);
+                break;
+            case 'fade_out':
+                this.drawFadeOutAnimation(progress);
+                break;
+            case 'shrink':
+                this.drawShrinkAnimation(progress);
+                break;
+            case 'bounce':
+                this.drawBounceAnimation(progress);
+                break;
+            default:
+                this.drawExplosionAnimation(progress);
+        }
+        
+        ctx.restore();
+        
+        // Remove enemy when animation is complete
+        if (progress >= 1.0) {
+            this.isDying = false;
+        }
+    }
+
+    getDeathFrames() {
+        // Different death animations based on enemy type
+        const enemyType = ENEMY_TYPES.find(type => type.face === this.originalText);
+        if (enemyType && enemyType.deathFrames) {
+            return enemyType.deathFrames;
+        }
+        
+        // Random death frame sets for variety
+        const deathFrameSets = [
+            // Explosion set
+            ['💥', '💢', '✨', '🌟', '⭐'],
+            // Fire set
+            ['🔥', '💥', '💢', '✨', '💨'],
+            // Lightning set
+            ['⚡', '💥', '✨', '🌟', '💫'],
+            // Skull set
+            ['💀', '☠️', '💥', '✨', '💨'],
+            // Star burst set
+            ['✨', '🌟', '⭐', '💫', '💥'],
+            // Smoke set
+            ['💨', '💢', '✨', '💫', '🌟'],
+            // Magic set
+            ['✨', '💫', '🌟', '⭐', '💥'],
+            // Cosmic set
+            ['🌌', '✨', '🌟', '💫', '⭐']
+        ];
+        
+        // Return a random death frame set
+        return deathFrameSets[Math.floor(Math.random() * deathFrameSets.length)];
+    }
+
+    // Explosion Animation - Scale up then explode with particles
+    drawExplosionAnimation(progress) {
+        // Scale up then down with explosion effect
+        this.scale = 1.0 + Math.sin(progress * Math.PI) * 0.5;
+        this.alpha = 1.0; // No fading
+        
+        ctx.translate(this.x + this.fontSize/2, this.y - this.fontSize/2);
+        ctx.scale(this.scale, this.scale);
+        ctx.globalAlpha = this.alpha;
+        
+        // Draw death frames
+        const deathFrames = this.getDeathFrames();
+        const frameIndex = Math.floor(progress * deathFrames.length);
+        const currentFrame = deathFrames[Math.min(frameIndex, deathFrames.length - 1)];
+        
+        ctx.font = `${this.fontSize}px`;
+        ctx.fillText(currentFrame, -this.fontSize/2, this.fontSize/2);
+        
+        // Create explosion particles
+        if (Math.random() < 0.4) {
+            this.createExplosionParticle();
+        }
+        this.drawExplosionParticles();
+    }
+    
+    // Fade Out Animation - Simple scale without fading
+    drawFadeOutAnimation(progress) {
+        this.alpha = 1.0; // No fading
+        this.scale = 1.0 + progress * 0.2; // Slight grow
+        
+        ctx.translate(this.x + this.fontSize/2, this.y - this.fontSize/2);
+        ctx.scale(this.scale, this.scale);
+        ctx.globalAlpha = this.alpha;
+        
+        const deathFrames = this.getDeathFrames();
+        const frameIndex = Math.floor(progress * deathFrames.length);
+        const currentFrame = deathFrames[Math.min(frameIndex, deathFrames.length - 1)];
+        
+        ctx.font = `${this.fontSize}px`;
+        ctx.fillText(currentFrame, -this.fontSize/2, this.fontSize/2);
+    }
+    
+    // Shrink Animation - Shrinks to nothing without fading
+    drawShrinkAnimation(progress) {
+        this.scale = 1.0 - progress;
+        this.alpha = 1.0; // No fading
+        
+        ctx.translate(this.x + this.fontSize/2, this.y - this.fontSize/2);
+        ctx.scale(this.scale, this.scale);
+        ctx.globalAlpha = this.alpha;
+        
+        const deathFrames = this.getDeathFrames();
+        const frameIndex = Math.floor(progress * deathFrames.length);
+        const currentFrame = deathFrames[Math.min(frameIndex, deathFrames.length - 1)];
+        
+        ctx.font = `${this.fontSize}px`;
+        ctx.fillText(currentFrame, -this.fontSize/2, this.fontSize/2);
+    }
+    
+    // Bounce Animation - Bounces without fading
+    drawBounceAnimation(progress) {
+        this.bounceVelocity += 0.3; // Gravity effect
+        const bounceOffset = Math.sin(progress * Math.PI * 3) * 10 * (1 - progress);
+        this.alpha = 1.0; // No fading
+        this.scale = 1.0 + Math.sin(progress * Math.PI * 2) * 0.2;
+        
+        ctx.translate(this.x + this.fontSize/2, this.y - this.fontSize/2 + bounceOffset);
+        ctx.scale(this.scale, this.scale);
+        ctx.globalAlpha = this.alpha;
+        
+        const deathFrames = this.getDeathFrames();
+        const frameIndex = Math.floor(progress * deathFrames.length);
+        const currentFrame = deathFrames[Math.min(frameIndex, deathFrames.length - 1)];
+        
+        ctx.font = `${this.fontSize}px`;
+        ctx.fillText(currentFrame, -this.fontSize/2, this.fontSize/2);
+    }
+    
+    // Create explosion particles
+    createExplosionParticle() {
+        this.explosionParticles.push({
+            x: this.x + (Math.random() - 0.5) * this.fontSize,
+            y: this.y + (Math.random() - 0.5) * this.fontSize,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            life: 1.0,
+            size: Math.random() * 4 + 2,
+            color: Math.random() > 0.5 ? '#ff6b6b' : '#ffd93d'
+        });
+    }
+    
+    // Draw explosion particles
+    drawExplosionParticles() {
+        this.explosionParticles.forEach((particle, index) => {
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            particle.life -= 0.02;
+            particle.size *= 0.98;
+            
+            if (particle.life > 0) {
+                ctx.save();
+                ctx.globalAlpha = particle.life * this.alpha;
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x - this.x, particle.y - this.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+    } else {
+                this.explosionParticles.splice(index, 1);
+            }
+        });
+    }
+
+    startDeathAnimation() {
+        this.isDying = true;
+        this.deathStartTime = Date.now();
+        
+        // Randomly select death animation variant
+        const variants = Object.values(CONFIG.DEATH_ANIMATION_VARIANTS);
+        this.deathVariant = variants[Math.floor(Math.random() * variants.length)];
+        
+        // Reset animation properties
+        this.scale = 1.0;
+        this.rotation = 0;
+        this.alpha = 1.0;
+        this.bounceVelocity = 0;
+        this.explosionParticles = [];
+    }
+}
+
+// Floating score text class
+class ScoreText {
+    constructor(x, y, text, color = '#ffffff') {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.startTime = Date.now();
+        this.duration = 1500; // 1.5 seconds
+        this.startY = y;
+        this.alpha = 1.0;
+        this.scale = 1.0;
+    }
+    
+    update() {
+        const elapsed = Date.now() - this.startTime;
+        const progress = elapsed / this.duration;
+        
+        if (progress >= 1.0) return false; // Remove when done
+        
+        // Float upward
+        this.y = this.startY - progress * 50;
+        
+        // Fade out
+        this.alpha = 1.0 - progress;
+        
+        // Scale effect
+        this.scale = 1.0 + Math.sin(progress * Math.PI) * 0.3;
+        
+        return true; // Keep alive
+    }
+    
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.scale(this.scale, this.scale);
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.text, this.x / this.scale, this.y / this.scale);
+        ctx.restore();
+    }
+}
+
+// Enhanced bullet class with visual effects
+class Bullet extends RectangleObj {
+    constructor(x, y, width, height, fillColor, strokeColor = '', strokeWidth = 2, type = 'player', behavior = 'normal', shape = 'circle') {
+        super(x, y, width, height, fillColor, strokeColor, strokeWidth);
+        this.type = type;
+        this.behavior = behavior;
+        this.shape = shape;
+        this.trail = []; // For trail effect
+        this.maxTrailLength = 5;
+        this.particles = []; // For particle effects
+        this.trackingTarget = null; // For tracking bullets
+        this.trackingSpeed = 0.1; // How fast tracking bullets adjust direction
+        this.angle = 0; // For tracking bullets
+        this.tomahawkPhase = 0; // For tomahawk missiles (0=up, 1=down, 2=tracking)
+        this.tomahawkHeight = 0; // Height reached before diving
+    }
+    
+    update() {
+        // Add current position to trail
+        this.trail.push({ x: this.x, y: this.y });
+        if (this.trail.length > this.maxTrailLength) {
+            this.trail.shift();
+        }
+        
+        // Get current speeds based on game progression
+        const speeds = getCurrentBulletSpeeds();
+        
+        // Move bullet based on behavior
+        if (this.type === 'player') {
+            this.y -= speeds.player;
+    } else {
+            // Enemy bullet behaviors
+            if (this.behavior === 'tracking' && this.trackingTarget) {
+                // Calculate angle to player
+                const dx = this.trackingTarget.x - this.x;
+                const dy = this.trackingTarget.y - this.y;
+                const targetAngle = Math.atan2(dy, dx);
+                
+                // Gradually adjust angle towards target
+                this.angle += (targetAngle - this.angle) * this.trackingSpeed;
+                
+                // Move in the calculated direction
+                this.x += Math.cos(this.angle) * speeds.enemy;
+                this.y += Math.sin(this.angle) * speeds.enemy;
+                
+                // Stop tracking when bullet gets close to bottom but maintain angle
+                if (this.y > canvas.height - 50) {
+                    this.trackingTarget = null; // Stop tracking
+                    this.behavior = 'tracking_fixed'; // Switch to fixed angle movement
+                }
+            } else if (this.behavior === 'tracking_fixed') {
+                // Continue moving in the same angle after stopping tracking
+                this.x += Math.cos(this.angle) * speeds.enemy;
+                this.y += Math.sin(this.angle) * speeds.enemy;
+            } else if (this.behavior === 'spiral') {
+                // Spiral movement pattern
+                this.angle += 0.1; // Rotate angle
+                this.x += Math.cos(this.angle) * speeds.enemy * 0.8;
+                this.y += speeds.enemy + Math.sin(this.angle) * speeds.enemy * 0.3;
+            } else if (this.behavior === 'zigzag') {
+                // Zigzag movement pattern
+                this.angle += 0.2;
+                this.x += Math.sin(this.angle) * speeds.enemy * 0.6;
+                this.y += speeds.enemy;
+            } else if (this.behavior === 'spread') {
+                // Move in spread pattern
+                this.x += Math.sin(this.angle) * speeds.enemy * 0.5;
+                this.y += speeds.enemy;
+            } else if (this.behavior === 'burst') {
+                // Move in burst pattern (all directions)
+                this.x += Math.cos(this.angle) * speeds.enemy * 0.7;
+                this.y += Math.sin(this.angle) * speeds.enemy * 0.7;
+    } else {
+                // Normal downward movement
+                this.y += speeds.enemy;
+            }
+        }
+        
+        // Update particles
+        this.particles = this.particles.filter(particle => {
+            particle.y += particle.vy;
+            particle.x += particle.vx;
+            particle.life--;
+            particle.alpha = particle.life / particle.maxLife;
+            return particle.life > 0;
+        });
+    }
+    
+    draw() {
+        // Draw trail
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        this.trail.forEach((point, index) => {
+            const alpha = (index + 1) / this.trail.length;
+            ctx.globalAlpha = alpha * 0.3;
+            ctx.fillStyle = this.fillColor;
+            ctx.fillRect(point.x + this.width/2 - 1, point.y + this.height/2 - 1, 2, 2);
+        });
+        ctx.restore();
+        
+        // Draw main bullet with glow effect
+        ctx.save();
+        ctx.shadowColor = this.fillColor;
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = this.fillColor;
+        ctx.strokeStyle = this.strokeColor;
+        ctx.lineWidth = this.strokeWidth;
+        
+        // Draw different shapes based on bullet type
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        const radius = Math.min(this.width, this.height) / 2;
+        
+        ctx.beginPath();
+        switch (this.shape) {
+            case 'circle':
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                break;
+            case 'square':
+                ctx.rect(this.x, this.y, this.width, this.height);
+                break;
+            case 'diamond':
+                ctx.moveTo(centerX, centerY - radius);
+                ctx.lineTo(centerX + radius, centerY);
+                ctx.lineTo(centerX, centerY + radius);
+                ctx.lineTo(centerX - radius, centerY);
+                ctx.closePath();
+                break;
+            case 'star':
+                // Draw star shape
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * Math.PI * 2) / 5;
+                    const x = centerX + Math.cos(angle) * radius;
+                    const y = centerY + Math.sin(angle) * radius;
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.closePath();
+                break;
+            default:
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+        }
+        
+        ctx.fill();
+        if (this.strokeColor) {
+            ctx.stroke();
+        }
+        
+        // Draw inner bright core
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'white';
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        switch (this.shape) {
+            case 'circle':
+                ctx.arc(centerX, centerY, radius * 0.6, 0, Math.PI * 2);
+                break;
+            case 'square':
+                ctx.rect(this.x + 1, this.y + 1, this.width - 2, this.height - 2);
+                break;
+            case 'diamond':
+                ctx.moveTo(centerX, centerY - radius * 0.6);
+                ctx.lineTo(centerX + radius * 0.4, centerY);
+                ctx.lineTo(centerX, centerY + radius * 0.6);
+                ctx.lineTo(centerX - radius * 0.4, centerY);
+                ctx.closePath();
+                break;
+            case 'star':
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * Math.PI * 2) / 5;
+                    const x = centerX + Math.cos(angle) * radius * 0.6;
+                    const y = centerY + Math.sin(angle) * radius * 0.6;
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                ctx.closePath();
+                break;
+        }
+        ctx.fill();
+        ctx.restore();
+        
+        // Draw particles
+        this.particles.forEach(particle => {
+            ctx.save();
+            ctx.globalAlpha = particle.alpha;
+            ctx.fillStyle = particle.color;
+            ctx.fillRect(particle.x, particle.y, 2, 2);
+            ctx.restore();
+        });
+    }
+    
+    createHitEffect() {
+        // Create particle explosion on hit
+        for (let i = 0; i < 8; i++) {
+            this.particles.push({
+                x: this.x + this.width/2,
+                y: this.y + this.height/2,
+                vx: (Math.random() - 0.5) * 4,
+                vy: (Math.random() - 0.5) * 4,
+                life: 20,
+                maxLife: 20,
+                alpha: 1,
+                color: this.fillColor
+            });
+        }
+    }
+}
+
+// Attack Pattern Functions
+function selectAttackPattern(enemyType) {
+    const patterns = enemyType.patterns;
+    const weights = enemyType.patternWeights;
+    
+    // Weighted random selection
+    const random = Math.random();
+    let cumulativeWeight = 0;
+    
+    for (let i = 0; i < patterns.length; i++) {
+        cumulativeWeight += weights[i];
+        if (random <= cumulativeWeight) {
+            return patterns[i];
+        }
+    }
+    
+    return patterns[0]; // Fallback
+}
+
+function executeAttackPattern(enemy, pattern) {
+    const enemyType = ENEMY_TYPES.find(type => type.face === enemy.text);
+    if (!enemyType) return;
+    
+    // Change enemy face to shooting animation
+    enemy.text = enemyType.shootFace;
+    
+    switch (pattern) {
+        case 'single':
+            createSingleBullet(enemy, enemyType);
+            break;
+        case 'line':
+            createLinePattern(enemy, enemyType);
+            break;
+        case 'spread':
+            createSpreadPattern(enemy, enemyType);
+            break;
+        case 'triple':
+            createTriplePattern(enemy, enemyType);
+            break;
+        case 'burst':
+            createBurstPattern(enemy, enemyType);
+            break;
+        case 'tracking':
+            createTrackingBullet(enemy, enemyType);
+            break;
+        case 'wall':
+            createWallPattern(enemy, enemyType);
+            break;
+        case 'spiral':
+            createSpiralPattern(enemy, enemyType);
+            break;
+        case 'zigzag':
+            createZigzagPattern(enemy, enemyType);
+            break;
+    }
+    
+    // Reset enemy face after animation
+            setTimeout(() => {
+        if (!enemy.isDying) {
+            enemy.text = enemyType.face;
+        }
+    }, CONFIG.SHOOT_ANIMATION_DURATION);
+}
+
+function createSingleBullet(enemy, enemyType) {
+    const bullet = new Bullet(
+        enemy.x, enemy.y, 10, 10,
+        enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy', 'normal', enemyType.bulletShape
+    );
+    gameState.enemyBullets.push(bullet);
+}
+
+function createLinePattern(enemy, enemyType) {
+    // Find all enemies of the same type in the same row
+    const sameRowEnemies = gameState.enemies.filter(e => 
+        e.y === enemy.y && 
+        e.text === enemyType.face && 
+        !e.isDying
+    );
+    
+    // Sort enemies by x position
+    sameRowEnemies.sort((a, b) => a.x - b.x);
+    
+    // Calculate synchronized line attack
+    const enemyCount = sameRowEnemies.length;
+    const maxSpread = canvas.width * 0.7; // 70% of screen width
+    const minSpacing = 40; // Minimum spacing between bullets
+    
+    // Calculate total spread needed
+    const totalSpread = Math.min(maxSpread, enemyCount * minSpacing);
+    const bulletSpacing = enemyCount > 1 ? totalSpread / (enemyCount - 1) : 0;
+    
+    // Create synchronized bullets from all enemies in the row
+    sameRowEnemies.forEach((enemyInRow, index) => {
+        // Change face to shooting animation
+        enemyInRow.text = enemyType.shootFace;
+        
+        // Create bullet from this enemy
+        const bullet = new Bullet(
+            enemyInRow.x, enemyInRow.y, 8, 8,
+            enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy', 'normal', enemyType.bulletShape
+        );
+        gameState.enemyBullets.push(bullet);
+        
+        // Reset face after animation
+                setTimeout(() => {
+            if (!enemyInRow.isDying) {
+                enemyInRow.text = enemyType.face;
+            }
+        }, CONFIG.SHOOT_ANIMATION_DURATION);
+    });
+}
+
+function createSpreadPattern(enemy, enemyType) {
+    // Create 5 bullets in a spread pattern
+    const angles = [-0.5, -0.25, 0, 0.25, 0.5];
+    angles.forEach(angle => {
+        const bullet = new Bullet(
+            enemy.x, enemy.y, 8, 8,
+            enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy'
+        );
+        bullet.angle = angle;
+        bullet.behavior = 'spread';
+        gameState.enemyBullets.push(bullet);
+    });
+}
+
+function createTriplePattern(enemy, enemyType) {
+    // Create 3 bullets with slight spread
+    const offsets = [-10, 0, 10];
+    offsets.forEach(offset => {
+        const bullet = new Bullet(
+            enemy.x + offset, enemy.y, 10, 10,
+            enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy'
+        );
+        gameState.enemyBullets.push(bullet);
+    });
+}
+
+function createBurstPattern(enemy, enemyType) {
+    // Create 8 bullets in all directions
+    for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const bullet = new Bullet(
+            enemy.x, enemy.y, 8, 8,
+            enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy'
+        );
+        bullet.angle = angle;
+        bullet.behavior = 'burst';
+        gameState.enemyBullets.push(bullet);
+    }
+}
+
+function createTrackingBullet(enemy, enemyType) {
+    const bullet = new Bullet(
+        enemy.x, enemy.y, 12, 12,
+        enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy', 'tracking'
+    );
+    bullet.trackingTarget = gameState.player;
+    bullet.trackingSpeed = 0.15;
+    gameState.enemyBullets.push(bullet);
+}
+
+function createSpiralPattern(enemy, enemyType) {
+    // Create a single spiral bullet
+    const bullet = new Bullet(
+        enemy.x, enemy.y, 8, 8,
+        enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy', 'spiral', 'star'
+    );
+    bullet.angle = Math.random() * Math.PI * 2; // Random starting angle
+    gameState.enemyBullets.push(bullet);
+}
+
+function createZigzagPattern(enemy, enemyType) {
+    // Create a single zigzag bullet
+    const bullet = new Bullet(
+        enemy.x, enemy.y, 6, 6,
+        enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy', 'zigzag', 'diamond'
+    );
+    bullet.angle = Math.random() * Math.PI * 2; // Random starting angle
+    gameState.enemyBullets.push(bullet);
+}
+
+function createWallPattern(enemy, enemyType) {
+    // Find all enemies of the same type in the same row
+    const sameRowEnemies = gameState.enemies.filter(e => 
+        e.y === enemy.y && 
+        e.text === enemyType.face && 
+        !e.isDying
+    );
+    
+    // Sort enemies by x position
+    sameRowEnemies.sort((a, b) => a.x - b.x);
+    
+    // Calculate synchronized wall attack
+    const enemyCount = sameRowEnemies.length;
+    const maxWallWidth = canvas.width * 0.8; // 80% of screen width for wall
+    const minSpacing = 30; // Minimum spacing between bullets
+    
+    // Calculate total wall width
+    const totalWallWidth = Math.min(maxWallWidth, enemyCount * minSpacing);
+    const wallStartX = Math.max(0, (canvas.width - totalWallWidth) / 2);
+    const wallEndX = wallStartX + totalWallWidth;
+    
+    // Calculate bullet positions across the wall
+    const bulletCount = Math.floor(totalWallWidth / 25); // 25px spacing
+    
+    // Create synchronized wall from all enemies in the row
+    sameRowEnemies.forEach((enemyInRow, index) => {
+        // Change face to shooting animation
+        enemyInRow.text = enemyType.shootFace;
+        
+        // Calculate this enemy's contribution to the wall
+        const enemyWallStart = wallStartX + (index * (totalWallWidth / enemyCount));
+        const enemyWallEnd = wallStartX + ((index + 1) * (totalWallWidth / enemyCount));
+        const enemyBulletCount = Math.floor((enemyWallEnd - enemyWallStart) / 25);
+        
+        // Create bullets for this enemy's section
+        for (let i = 0; i < enemyBulletCount; i++) {
+            const bulletX = enemyWallStart + (i * 25);
+            const bullet = new Bullet(
+                bulletX, enemyInRow.y, 8, 8,
+                enemyType.bulletColor, enemyType.bulletStroke || '', 2, 'enemy'
+            );
+            gameState.enemyBullets.push(bullet);
+        }
+        
+        // Reset face after animation
+                setTimeout(() => {
+            if (!enemyInRow.isDying) {
+                enemyInRow.text = enemyType.face;
+            }
+        }, CONFIG.SHOOT_ANIMATION_DURATION);
+    });
+}
+
+// Input Handling Functions
+function handlePlayerMovement() {
+    if (!gameState.isRunning) return;
+    
+    let moveX = 0;
+    let moveY = 0;
+    
+    // Keyboard movement
+    if (gameState.keys.left || gameState.keys.a) {
+        moveX = -CONFIG.PLAYER_MOVE_SPEED;
+    }
+    if (gameState.keys.right || gameState.keys.d) {
+        moveX = CONFIG.PLAYER_MOVE_SPEED;
+    }
+    if (gameState.keys.up || gameState.keys.w) {
+        moveY = -CONFIG.PLAYER_MOVE_SPEED;
+    }
+    if (gameState.keys.down || gameState.keys.s) {
+        moveY = CONFIG.PLAYER_MOVE_SPEED;
+    }
+    
+    // Apply movement
+    gameState.player.x += moveX;
+    gameState.player.y += moveY;
+    
+    // Keep player within screen bounds
+    gameState.player.x = Math.max(
+        CONFIG.PLAYER_BOUNDARY_MARGIN, 
+        Math.min(canvas.width - CONFIG.PLAYER_BOUNDARY_MARGIN, gameState.player.x)
+    );
+    gameState.player.y = Math.max(
+        canvas.height - 100, // Don't go too high
+        Math.min(canvas.height - CONFIG.PLAYER_BOUNDARY_MARGIN, gameState.player.y)
+    );
+}
+
+function handlePlayerShooting() {
+    if (!gameState.isRunning || !gameState.player.canShoot) return;
+    
+    // Check for shooting input (spacebar, mouse click, or touch)
+    if (gameState.keys.space) {
+        shootBullet();
+    }
+}
+
+function shootBullet() {
+    if (!gameState.player.canShoot || !gameState.isRunning) return;
+    
+    gameState.player.sprite = gameState.player.shootSprite;
+    gameState.playerBullets.push(new Bullet(
+        gameState.player.x + 17, 
+        gameState.player.y - 20, // Shoot from above player
+        5, 
+        5, 
+        'red',
+        '',
+        2,
+        'player'
+    ));
+
+setTimeout(() => {
+        gameState.player.sprite = '🗻';
+    }, 200);
+    
+    gameState.player.canShoot = false;
+        setTimeout(() => {
+        gameState.player.canShoot = true;
+    }, CONFIG.PLAYER_COOLDOWN);
+}
+
+// Utility Functions
+function getCurrentBulletSpeeds() {
+    const gameTime = Date.now() - gameState.gameStartTime;
+    const speedIntervals = Math.floor(gameTime / CONFIG.SPEED_INCREASE_INTERVAL);
+    
+    // Calculate speed multiplier with exponential growth
+    const speedMultiplier = Math.min(
+        1 + (speedIntervals * CONFIG.SPEED_INCREASE_RATE),
+        2.0 // Cap at 2x speed
+    );
+    
+    gameState.currentSpeedMultiplier = speedMultiplier;
+    
+    return {
+        player: Math.min(
+            CONFIG.BULLET_SPEED_PLAYER_BASE * speedMultiplier,
+            CONFIG.BULLET_SPEED_PLAYER_MAX
+        ),
+        enemy: Math.min(
+            CONFIG.BULLET_SPEED_ENEMY_BASE * speedMultiplier,
+            CONFIG.BULLET_SPEED_ENEMY_MAX
+        )
+    };
+}
+
+
+// Background Functions
+function initializeBackground() {
+    if (gameState.background.initialized) return;
+    
+    // Create static stars (no movement)
+    for (let i = 0; i < CONFIG.BACKGROUND.STAR_COUNT; i++) {
+        gameState.background.stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * (CONFIG.BACKGROUND.STAR_SIZE_MAX - CONFIG.BACKGROUND.STAR_SIZE_MIN) + CONFIG.BACKGROUND.STAR_SIZE_MIN,
+            opacity: Math.random() * 0.3 + 0.1, // Much dimmer stars
+            twinkle: Math.random() * Math.PI * 2,
+            color: Math.random() > 0.8 ? '#ff6b6b' : Math.random() > 0.6 ? '#4ecdc4' : '#ffffff' // Some colored stars
+        });
+    }
+    
+    // Create static nebulas (big glowy things)
+    for (let i = 0; i < CONFIG.BACKGROUND.NEBULA_COUNT; i++) {
+        const colors = ['#4a148c', '#1a237e', '#6a1b9a', '#2e1065', '#7b1fa2'];
+        gameState.background.nebulas.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * (CONFIG.BACKGROUND.NEBULA_SIZE_MAX - CONFIG.BACKGROUND.NEBULA_SIZE_MIN) + CONFIG.BACKGROUND.NEBULA_SIZE_MIN,
+            opacity: Math.random() * 0.4 + 0.1,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            pulse: Math.random() * Math.PI * 2
+        });
+    }
+    
+    gameState.background.initialized = true;
+}
+
+function updateBackground() {
+    // Update star twinkling (no movement)
+    gameState.background.stars.forEach(star => {
+        star.twinkle += 0.1;
+    });
+    
+    // Update nebula pulsing (no movement)
+    gameState.background.nebulas.forEach(nebula => {
+        nebula.pulse += 0.05;
+    });
+}
+
+function drawBackground() {
+    // Enhanced gradient background with more depth
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#000000');
+    gradient.addColorStop(0.3, '#0a0a0a');
+    gradient.addColorStop(0.6, '#1a1a2e');
+    gradient.addColorStop(1, '#16213e');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw static nebulas with pulsing effect
+    gameState.background.nebulas.forEach(nebula => {
+        ctx.save();
+        
+        // Pulsing opacity
+        const pulseOpacity = nebula.opacity + Math.sin(nebula.pulse) * 0.1;
+        ctx.globalAlpha = Math.max(0, Math.min(0.5, pulseOpacity));
+        
+        const nebulaGradient = ctx.createRadialGradient(
+            nebula.x, nebula.y, 0,
+            nebula.x, nebula.y, nebula.size
+        );
+        nebulaGradient.addColorStop(0, nebula.color);
+        nebulaGradient.addColorStop(0.5, nebula.color + '80');
+        nebulaGradient.addColorStop(1, 'transparent');
+        
+        ctx.fillStyle = nebulaGradient;
+        ctx.beginPath();
+        ctx.arc(nebula.x, nebula.y, nebula.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    });
+    
+    // Draw static stars (no movement)
+    gameState.background.stars.forEach(star => {
+        ctx.save();
+        
+        // Much dimmer twinkling effect
+        const twinkleOpacity = star.opacity + Math.sin(star.twinkle) * 0.1; // Reduced from 0.2
+        ctx.globalAlpha = Math.max(0, Math.min(1, twinkleOpacity));
+        
+        ctx.fillStyle = star.color;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Much dimmer glow effect for larger stars
+        if (star.size > 2) {
+            ctx.globalAlpha = twinkleOpacity * 0.15; // Reduced from 0.3
+            ctx.shadowColor = star.color;
+            ctx.shadowBlur = 5; // Reduced from 10
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.size * 1.5, 0, Math.PI * 2); // Reduced from 2
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    });
+}
+
+function createEnemies() {
+    const enemies = [];
+    const startX = ((canvas.width / 2) / 2) / 2;
+    let currentY = 80;
+
+    for (let row = 0; row < CONFIG.ENEMY_ROWS; row++) {
+        const enemyType = ENEMY_TYPES[row % ENEMY_TYPES.length];
+        
+        for (let col = 0; col < CONFIG.ENEMY_COLS; col++) {
+            const x = col === 0 ? startX : enemies[enemies.length - 1].x + CONFIG.ENEMY_SPACING_X;
+            enemies.push(new TextC(enemyType.face, x, currentY, CONFIG.ENEMY_FONT_SIZE));
+        }
+        
+        currentY += CONFIG.ENEMY_SPACING_Y;
+    }
+    
+    return enemies;
+}
+
+function checkCollision(rect1, rect2) {
+    return rect1.x < rect2.x + 38 && 
+           rect1.x + rect1.width > rect2.x &&
+           rect1.y < rect2.y + 32 && 
+           rect1.y + rect1.height > rect2.y;
+}
+
+function animateText(textObj, frames, duration = CONFIG.BLINK_DURATION) {
+    let frameIndex = 0;
+    const interval = setInterval(() => {
+        textObj.text = frames[frameIndex % frames.length];
+        frameIndex++;
+        
+        if (frameIndex >= frames.length * 2) {
+            clearInterval(interval);
+        }
+    }, duration);
+}
+
+function blinkPlayer() {
+    const originalSprite = gameState.player.sprite;
+    let blinkCount = 0;
+    const maxBlinks = 6;
+    
+    const blinkInterval = setInterval(() => {
+        gameState.player.sprite = gameState.player.sprite === originalSprite ? '' : originalSprite;
+        blinkCount++;
+        
+        if (blinkCount >= maxBlinks) {
+            gameState.player.sprite = originalSprite;
+            clearInterval(blinkInterval);
+        }
+    }, CONFIG.BLINK_DURATION);
+}
+
+function handlePlayerHit() {
+    if (gameState.player.isInvulnerable) return;
+    
+    gameState.player.isInvulnerable = true;
+    gameState.player.lives--;
+    blinkPlayer();
+    
+        setTimeout(() => {
+        gameState.player.isInvulnerable = false;
+    }, CONFIG.INVULNERABILITY_TIME);
+    
+    if (gameState.player.lives <= 0) {
+        endGame(false);
+    }
+}
+
+// Scoring Functions
+function calculateScore(enemy) {
+    const basePoints = CONFIG.SCORING.ENEMY_POINTS[enemy.originalText] || 10;
+    let totalPoints = basePoints;
+    
+    // Check for combo
+    const currentTime = Date.now();
+    const timeSinceLastKill = currentTime - gameState.scoring.lastKillTime;
+    
+    if (timeSinceLastKill < CONFIG.SCORING.COMBO_TIMEOUT) {
+        gameState.scoring.comboCount++;
+        totalPoints = Math.floor(basePoints * CONFIG.SCORING.COMBO_MULTIPLIER);
+    } else {
+        gameState.scoring.comboCount = 1;
+    }
+    
+    gameState.scoring.lastKillTime = currentTime;
+    gameState.scoring.totalKills++;
+    gameState.scoring.score += totalPoints;
+    
+    return totalPoints;
+}
+
+function createScoreText(x, y, points, isCombo = false) {
+    const color = isCombo ? '#ffd700' : '#ffffff'; // Gold for combos, white for normal
+    const text = isCombo ? `+${points} COMBO!` : `+${points}`;
+    
+    // Position score text above the enemy, not on it
+    const scoreX = x;
+    const scoreY = y - 50; // 50 pixels above the enemy
+    
+    gameState.scoring.scoreTexts.push(new ScoreText(scoreX, scoreY, text, color));
+}
+
+function updateScoreTexts() {
+    gameState.scoring.scoreTexts = gameState.scoring.scoreTexts.filter(scoreText => {
+        const isAlive = scoreText.update();
+        if (isAlive) {
+            scoreText.draw();
+        }
+        return isAlive;
+    });
+}
+
+function handleEnemyHit(bulletIndex, enemyIndex) {
+    const enemy = gameState.enemies[enemyIndex];
+    if (!enemy || enemy.isDying) return; // Prevent double hits
+    
+    // Calculate and display score
+    const points = calculateScore(enemy);
+    const isCombo = gameState.scoring.comboCount > 1;
+    createScoreText(enemy.x, enemy.y, points, isCombo);
+    
+    // Start death animation
+    enemy.startDeathAnimation();
+    
+    // Remove bullet immediately
+    gameState.playerBullets.splice(bulletIndex, 1);
+    
+    // Remove enemy after animation completes
+        setTimeout(() => {
+        const currentIndex = gameState.enemies.indexOf(enemy);
+        if (currentIndex !== -1) {
+            gameState.enemies.splice(currentIndex, 1);
+        }
+    }, enemy.deathDuration);
+}
+
+function enemyShoot(enemy) {
+    if (!enemy || enemy.isDying) return;
+    
+    const enemyType = ENEMY_TYPES.find(type => type.face === enemy.text);
+    if (!enemyType) return;
+    
+    // Select and execute attack pattern
+    const pattern = selectAttackPattern(enemyType);
+    executeAttackPattern(enemy, pattern);
+}
+
+function endGame(victory) {
+    if (gameState.isGameOver) return; // Prevent multiple calls
+    
+    gameState.isRunning = false;
+    gameState.isGameOver = true;
+    gameState.victory = victory;
+    
+    // Stop all enemy shooting
+    clearInterval(gameState.enemyShootInterval);
+    
+    // Show the new HUD game over screen
+    showGameOverScreen(victory);
+}
+
+function resetGame() {
+    // Clear existing intervals
+    if (gameState.enemyShootInterval) {
+        clearInterval(gameState.enemyShootInterval);
+    }
+    
+    // Initialize background
+    initializeBackground();
+    
+    gameState.enemies = createEnemies();
+    gameState.playerBullets = [];
+    gameState.enemyBullets = [];
+    gameState.player.lives = 3;
+    gameState.player.isInvulnerable = false;
+    gameState.player.canShoot = true;
+    gameState.player.sprite = '🗻';
+    gameState.isRunning = true;
+    gameState.isGameOver = false;
+    gameState.showGameOverText = false;
+    
+    // Reset scoring system
+    gameState.scoring.score = 0;
+    gameState.scoring.comboCount = 0;
+    gameState.scoring.lastKillTime = 0;
+    gameState.scoring.totalKills = 0;
+    gameState.scoring.perfectShots = 0;
+    gameState.scoring.scoreTexts = [];
+    
+    // Hide game over screen
+    hideGameOverScreen();
+    gameState.enemyDirection = 1;
+    gameState.enemyMoveDown = false;
+    gameState.enemyMovementState = {
+        currentPattern: 'formation',
+        formationIntegrity: 1.0,
+        lastDirectionChange: 0,
+        advanceTimer: 0,
+        scatterTimer: 0,
+        speedMultiplier: 1.0
+    };
+    gameState.gameStartTime = Date.now();
+    gameState.currentSpeedMultiplier = 1.0;
+    
+    // Restart enemy shooting
+        setTimeout(() => {
+        gameState.enemyShootInterval = setInterval(() => {
+            if (!gameState.isRunning) return;
+            
+            const shootCount = Math.min(6, gameState.enemies.length);
+            for (let i = 0; i < shootCount; i++) {
+                const randomEnemy = gameState.enemies[Math.floor(Math.random() * gameState.enemies.length)];
+            setTimeout(() => {
+                    enemyShoot(randomEnemy);
+                }, i * 1000);
+            }
+        }, CONFIG.ENEMY_SHOOT_INTERVAL);
+    }, CONFIG.ENEMY_SHOOT_DELAY);
+}
+
+// Initialize enemies
+gameState.enemies = createEnemies();
+
+// Animation Loop using requestAnimationFrame
+let lastTime = 0;
+// Enhanced Enemy Movement System
+function calculateFormationIntegrity() {
+    if (gameState.enemies.length === 0) return 1.0;
+    
+    const rows = {};
+    let totalDeviation = 0;
+    let totalEnemies = 0;
+    
+    // Group enemies by row
+    gameState.enemies.forEach(enemy => {
+        const rowKey = Math.round(enemy.y / CONFIG.ENEMY_SPACING_Y);
+        if (!rows[rowKey]) rows[rowKey] = [];
+        rows[rowKey].push(enemy);
+    });
+    
+    // Calculate deviation for each row
+    Object.values(rows).forEach(row => {
+        if (row.length < 2) return;
+        
+        row.sort((a, b) => a.x - b.x);
+        const expectedSpacing = CONFIG.ENEMY_SPACING_X;
+        
+        for (let i = 1; i < row.length; i++) {
+            const actualSpacing = row[i].x - row[i-1].x;
+            const deviation = Math.abs(actualSpacing - expectedSpacing) / expectedSpacing;
+            totalDeviation += deviation;
+            totalEnemies++;
+        }
+    });
+    
+    const averageDeviation = totalEnemies > 0 ? totalDeviation / totalEnemies : 0;
+    return Math.max(0, 1 - averageDeviation);
+}
+
+function updateEnemyMovementState() {
+    const currentTime = Date.now();
+    const movementState = gameState.enemyMovementState;
+    
+    // Update formation integrity
+    movementState.formationIntegrity = calculateFormationIntegrity();
+    
+    // Determine movement pattern based on game state
+    const enemyCount = gameState.enemies.length;
+    const totalEnemies = CONFIG.ENEMY_ROWS * CONFIG.ENEMY_COLS;
+    const enemyRatio = enemyCount / totalEnemies;
+    
+    // Speed scaling based on enemy count and game progress
+    const timeElapsed = (currentTime - gameState.gameStartTime) / 1000;
+    const speedIncrease = Math.floor(timeElapsed / (CONFIG.SPEED_INCREASE_INTERVAL / 1000)) * CONFIG.SPEED_INCREASE_RATE;
+    movementState.speedMultiplier = 1.0 + speedIncrease + (1 - enemyRatio) * 0.3; // Reduced from 0.5 to 0.3
+    
+    // Simplified pattern selection - mostly formation with occasional advances
+    if (enemyRatio < 0.2) {
+        // Very few enemies left - scatter
+        movementState.currentPattern = 'scatter';
+    } else if (currentTime - movementState.advanceTimer > 8000) { // Increased from 5000 to 8000
+        // Less frequent advances
+        movementState.currentPattern = 'advance';
+        movementState.advanceTimer = currentTime;
+    } else {
+        // Default formation movement (most of the time)
+        movementState.currentPattern = 'formation';
+    }
+}
+
+function moveEnemyInFormation(enemy) {
+    const movementState = gameState.enemyMovementState;
+    const baseSpeed = CONFIG.ENEMY_MOVE_SPEED * movementState.speedMultiplier;
+    
+    // Smooth, consistent movement without random variations
+    enemy.x += baseSpeed * gameState.enemyDirection;
+    
+    // Check boundaries and handle direction change
+    if (enemy.x + baseSpeed + 45 > canvas.width || enemy.x + baseSpeed <= 0) {
+        if (Date.now() - movementState.lastDirectionChange > 1000) { // Prevent rapid direction changes
+            gameState.enemyDirection = -gameState.enemyDirection;
+            movementState.lastDirectionChange = Date.now();
+            
+            // Move all enemies down
+            gameState.enemies.forEach(e => {
+                e.y += CONFIG.ENEMY_MOVE_DOWN;
+            });
+            
+            // Check if enemies reached bottom
+            if (enemy.y >= canvas.height - 30) {
+                endGame(false);
+                return;
+            }
+        }
+    }
+}
+
+function moveEnemyScattered(enemy) {
+    const movementState = gameState.enemyMovementState;
+    const baseSpeed = CONFIG.ENEMY_MOVE_SPEED * movementState.speedMultiplier * 1.5; // Slightly faster but not chaotic
+    
+    // Smooth movement with occasional direction changes
+    enemy.x += baseSpeed * gameState.enemyDirection;
+    
+    // Occasional random direction change (much less frequent)
+    if (Math.random() < 0.02) { // Reduced from 0.1 to 0.02
+        gameState.enemyDirection = Math.random() < 0.5 ? 1 : -1;
+    }
+    
+    // Check boundaries
+    if (enemy.x + baseSpeed + 45 > canvas.width || enemy.x + baseSpeed <= 0) {
+        gameState.enemyDirection = -gameState.enemyDirection;
+        
+        // Sometimes advance down when hitting boundaries
+        if (Math.random() < 0.2) { // Reduced from 0.3 to 0.2
+            enemy.y += CONFIG.ENEMY_MOVE_DOWN * 0.5;
+        }
+        
+        if (enemy.y >= canvas.height - 30) {
+            endGame(false);
+            return;
+        }
+    }
+}
+
+function moveEnemyAdvance(enemy) {
+    const movementState = gameState.enemyMovementState;
+    const advanceSpeed = CONFIG.ENEMY_MOVE_SPEED * movementState.speedMultiplier * 2; // Faster but smooth
+    
+    // Move down smoothly
+    enemy.y += CONFIG.ENEMY_MOVE_DOWN * 0.3; // Reduced from 0.1 to be more noticeable
+    
+    // Move horizontally
+    enemy.x += advanceSpeed * gameState.enemyDirection;
+    
+    // Check boundaries
+    if (enemy.x + advanceSpeed + 45 > canvas.width || enemy.x + advanceSpeed <= 0) {
+        gameState.enemyDirection = -gameState.enemyDirection;
+    }
+    
+    if (enemy.y >= canvas.height - 30) {
+        endGame(false);
+        return;
+    }
+}
+
+// Simplified Enemy Movement System
+function updateEnemyMovement() {
+    const currentTime = Date.now();
+    const movementState = gameState.enemyMovementState;
+    
+    // Calculate speed multiplier based on game progress
+    const timeElapsed = (currentTime - gameState.gameStartTime) / 1000;
+    const speedIncrease = Math.floor(timeElapsed / (CONFIG.SPEED_INCREASE_INTERVAL / 1000)) * CONFIG.SPEED_INCREASE_RATE;
+    const enemyCount = gameState.enemies.length;
+    const totalEnemies = CONFIG.ENEMY_ROWS * CONFIG.ENEMY_COLS;
+    const enemyRatio = enemyCount / totalEnemies;
+    
+    movementState.speedMultiplier = 1.0 + speedIncrease + (1 - enemyRatio) * 0.2;
+    
+    // Simple movement - mostly formation with occasional speed bursts
+    const baseSpeed = CONFIG.ENEMY_MOVE_SPEED * movementState.speedMultiplier;
+    
+    gameState.enemies.forEach((enemy, index) => {
+        // Smooth horizontal movement - continue even when dying
+        enemy.x += baseSpeed * gameState.enemyDirection;
+        
+        if (enemy.isDying) {
+            // Draw the death animation and continue
+            enemy.draw();
+            return;
+        }
+        
+        // Check boundaries
+        if (enemy.x + baseSpeed + 45 > canvas.width || enemy.x + baseSpeed <= 0) {
+            if (Date.now() - movementState.lastDirectionChange > 1000) {
+                gameState.enemyDirection = -gameState.enemyDirection;
+                movementState.lastDirectionChange = Date.now();
+                
+                // Move all enemies down
+                gameState.enemies.forEach(e => {
+                    e.y += CONFIG.ENEMY_MOVE_DOWN;
+                });
+                
+                // Check if enemies reached bottom
+                if (enemy.y >= canvas.height - 30) {
+                    endGame(false);
+                    return;
+                }
+            }
+        }
+        
+        // Draw the enemy
+        enemy.draw();
+    });
+}
+
+function gameLoop(currentTime) {
+    // Always continue the loop, but only update game logic if running
+    requestAnimationFrame(gameLoop);
+    
+    if (!gameState.isRunning) {
+        // Still draw the game over screen
+        if (gameState.isGameOver) {
+            drawBackground();
+            updateBackground();
+            
+            // Draw game over text
+            ctx.font = '168px';
+            ctx.fillStyle = gameState.victory ? 'green' : 'red';
+            ctx.fillText(gameState.gameOverText, (canvas.width / 2) - 200, canvas.height / 2);
+            
+            // Draw final score
+            ctx.font = '48px';
+            ctx.fillStyle = 'white';
+            const timeSurvived = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
+            ctx.fillText(`Time Survived: ${timeSurvived}s`, (canvas.width / 2) - 150, canvas.height / 2 + 100);
+        }
+        return;
+    }
+    
+    const deltaTime = currentTime - lastTime;
+    if (deltaTime < CONFIG.FRAME_RATE) {
+        return;
+    }
+    lastTime = currentTime;
+    
+    // Clear canvas and draw background
+    drawBackground();
+    updateBackground();
+    
+    // Handle input
+    handlePlayerMovement();
+    handlePlayerShooting();
+    
+    // Update HUD
+    updateHUD();
+    
+    // Update and draw floating score texts
+    updateScoreTexts();
+    
+    // Draw UI (hearts removed - lives shown in HUD)
+    
+    // Draw player
+    ctx.font = '32px Georgia';
+    ctx.fillText(gameState.player.sprite, gameState.player.x, gameState.player.y);
+    
+    // Update and draw enemies with new movement system
+    updateEnemyMovement();
+    
+    
+    // Update and draw enemy bullets
+    gameState.enemyBullets.forEach((bullet, index) => {
+        bullet.update();
+        bullet.draw();
+        
+        // Remove bullets that are off screen
+        if (bullet.y > canvas.height) {
+            gameState.enemyBullets.splice(index, 1);
+            return;
+        }
+        
+        // Check collision with player
+        if (checkCollision(bullet, { x: gameState.player.x, y: gameState.player.y, width: 38, height: 32 })) {
+            bullet.createHitEffect();
+            handlePlayerHit();
+            gameState.enemyBullets.splice(index, 1);
+        }
+    });
+    
+    // Update and draw player bullets
+    gameState.playerBullets.forEach((bullet, bulletIndex) => {
+        bullet.update();
+        bullet.draw();
+        
+        // Remove bullets that are off screen
+        if (bullet.y < 0) {
+            gameState.playerBullets.splice(bulletIndex, 1);
+            return;
+        }
+        
+        // Check collision with enemies (iterate backwards to avoid index issues)
+        for (let enemyIndex = gameState.enemies.length - 1; enemyIndex >= 0; enemyIndex--) {
+            const enemy = gameState.enemies[enemyIndex];
+            if (!enemy.isDying && checkCollision(bullet, enemy)) {
+                bullet.createHitEffect();
+                handleEnemyHit(bulletIndex, enemyIndex);
+                break; // Only hit one enemy per bullet
+            }
+        }
+    });
+    
+    // Check win condition
+    if (gameState.enemies.length === 0 && gameState.isRunning) {
+        endGame(true);
+    }
+}
+
+// Enemy shooting system
+            setTimeout(() => {
+    gameState.enemyShootInterval = setInterval(() => {
+        if (!gameState.isRunning) return;
+        
+        // Select random enemies to shoot
+        const shootCount = Math.min(6, gameState.enemies.length);
+        for (let i = 0; i < shootCount; i++) {
+            const randomEnemy = gameState.enemies[Math.floor(Math.random() * gameState.enemies.length)];
+            setTimeout(() => {
+                enemyShoot(randomEnemy);
+            }, i * 1000); // Stagger shots
+        }
+    }, CONFIG.ENEMY_SHOOT_INTERVAL);
+}, CONFIG.ENEMY_SHOOT_DELAY);
+
+// Event Listeners
+// Mouse controls
+addEventListener('mousemove', (event) => {
+    gameState.mouse.x = event.clientX;
+    gameState.mouse.y = event.clientY;
+    
+    // Optional: Follow mouse for movement (can be disabled for keyboard-only)
+    if (gameState.keys.left || gameState.keys.right || gameState.keys.a || gameState.keys.d) {
+        // Don't follow mouse if keyboard is being used
+        return;
+    }
+    gameState.player.x = event.clientX;
+});
+
+addEventListener('click', (event) => {
+    if (!gameState.isRunning) return;
+    shootBullet();
+});
+
+// Keyboard controls
+addEventListener('keydown', (event) => {
+    switch(event.code) {
+        case 'ArrowLeft':
+        case 'KeyA':
+            gameState.keys.left = true;
+            gameState.keys.a = true;
+            break;
+        case 'ArrowRight':
+        case 'KeyD':
+            gameState.keys.right = true;
+            gameState.keys.d = true;
+            break;
+        case 'ArrowUp':
+        case 'KeyW':
+            gameState.keys.up = true;
+            gameState.keys.w = true;
+            break;
+        case 'ArrowDown':
+        case 'KeyS':
+            gameState.keys.down = true;
+            gameState.keys.s = true;
+            break;
+        case 'Space':
+            event.preventDefault(); // Prevent page scroll
+            gameState.keys.space = true;
+            break;
+    }
+});
+
+addEventListener('keyup', (event) => {
+    switch(event.code) {
+        case 'ArrowLeft':
+        case 'KeyA':
+            gameState.keys.left = false;
+            gameState.keys.a = false;
+            break;
+        case 'ArrowRight':
+        case 'KeyD':
+            gameState.keys.right = false;
+            gameState.keys.d = false;
+            break;
+        case 'ArrowUp':
+        case 'KeyW':
+            gameState.keys.up = false;
+            gameState.keys.w = false;
+            break;
+        case 'ArrowDown':
+        case 'KeyS':
+            gameState.keys.down = false;
+            gameState.keys.s = false;
+            break;
+        case 'Space':
+            gameState.keys.space = false;
+            break;
+    }
+});
+
+// Window resize
+window.addEventListener('resize', () => {
+    canvas.width = Math.min(window.innerWidth - 60, 1200); // Max width for better gameplay
+    canvas.height = Math.min(window.innerHeight - 20, 1000); // Much taller canvas for maximum vertical space
+    console.log(`Canvas Size: X${canvas.width} Y${canvas.height}`);
+    
+    // Reset game instead of reloading
+        setTimeout(() => {
+        resetGame();
+    }, CONFIG.RESIZE_RELOAD_DELAY);
+});
+
+// Prevent context menu on right click
+addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+});
+
+// Prevent text selection
+document.addEventListener('selectstart', (e) => {
+    e.preventDefault();
+});
+
+// Prevent drag and drop
+document.addEventListener('dragstart', (e) => {
+    e.preventDefault();
+});
+
+// Prevent text selection on canvas
+canvas.addEventListener('selectstart', (e) => {
+    e.preventDefault();
+});
+
+canvas.addEventListener('dragstart', (e) => {
+    e.preventDefault();
+});
+
+// Prevent double-tap zoom
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+    }
+    lastTouchEnd = now;
+}, false);
+
+// Prevent zoom gestures
+document.addEventListener('gesturestart', (e) => {
+    e.preventDefault();
+});
+
+document.addEventListener('gesturechange', (e) => {
+    e.preventDefault();
+});
+
+document.addEventListener('gestureend', (e) => {
+    e.preventDefault();
+});
+
+// HUD Management Functions
+function initializeHUD() {
+    gameState.hudElements.scoreDisplay = document.getElementById('score-display');
+    gameState.hudElements.levelDisplay = document.getElementById('level-display');
+    gameState.hudElements.livesDisplay = document.getElementById('lives-display');
+    gameState.hudElements.gameOverScreen = document.getElementById('game-over-screen');
+    gameState.hudElements.gameOverTitle = document.getElementById('game-over-title');
+    gameState.hudElements.finalScore = document.getElementById('final-score');
+}
+
+function updateHUD() {
+    if (gameState.hudElements.scoreDisplay) {
+        gameState.hudElements.scoreDisplay.textContent = gameState.scoring.score;
+    }
+    if (gameState.hudElements.levelDisplay) {
+        gameState.hudElements.levelDisplay.textContent = gameState.level;
+    }
+    if (gameState.hudElements.livesDisplay) {
+        gameState.hudElements.livesDisplay.textContent = gameState.player.lives;
+    }
+}
+
+function showGameOverScreen(isVictory = false) {
+    if (gameState.hudElements.gameOverScreen) {
+        gameState.hudElements.gameOverScreen.style.display = 'flex';
+        if (gameState.hudElements.gameOverTitle) {
+            gameState.hudElements.gameOverTitle.textContent = isVictory ? 'VICTORY!' : 'GAME OVER';
+        }
+        if (gameState.hudElements.finalScore) {
+            gameState.hudElements.finalScore.textContent = gameState.score;
+        }
+    }
+}
+
+function hideGameOverScreen() {
+    if (gameState.hudElements.gameOverScreen) {
+        gameState.hudElements.gameOverScreen.style.display = 'none';
+    }
+}
+
+// Global restart function for the button
+function restartGame() {
+    hideGameOverScreen();
+    resetGame();
+}
+
+// Initialize HUD when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    initializeHUD();
+    initializeMobileControls();
+    initializeBackground(); // Initialize background on page load
+});
+
+// Start the game
+requestAnimationFrame(gameLoop);

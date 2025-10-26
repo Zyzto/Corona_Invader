@@ -70,6 +70,39 @@ const CONFIG = {
   }
 };
 
+// Level Configuration
+const LEVEL_CONFIG = [
+  { 
+    level: 1, enemyRows: 3, enemyCols: 8, 
+    bulletSpeed: 4, enemySpeed: 1.5, shootInterval: 5000,
+    enemyTypes: ['🤢']
+  },
+  { 
+    level: 2, enemyRows: 4, enemyCols: 9,
+    bulletSpeed: 5, enemySpeed: 1.8, shootInterval: 4500,
+    enemyTypes: ['🤢', '😷']
+  },
+  { 
+    level: 3, enemyRows: 4, enemyCols: 10,
+    bulletSpeed: 6, enemySpeed: 2.0, shootInterval: 4000,
+    enemyTypes: ['🤢', '😷', '😈']
+  },
+  { 
+    level: 4, enemyRows: 5, enemyCols: 10,
+    bulletSpeed: 7, enemySpeed: 2.2, shootInterval: 3500,
+    enemyTypes: ['😷', '😈']
+  },
+  { 
+    level: 5, enemyRows: 5, enemyCols: 11,
+    bulletSpeed: 8, enemySpeed: 2.5, shootInterval: 3000,
+    enemyTypes: ['😈']
+  },
+  {
+    level: 6, isBoss: true,
+    bulletSpeed: 9, enemySpeed: 1.0, shootInterval: 2000
+  }
+];
+
 // Enemy types with attack patterns
 const ENEMY_TYPES = [
   {
@@ -118,6 +151,10 @@ const gameState = {
   isGameOver: false,
   victory: false,
   level: 1,
+  maxLevel: 6,
+  isBossLevel: false,
+  boss: null,
+  levelComplete: false,
   gameStartTime: Date.now(),
   currentSpeedMultiplier: 1.0,
   mouse: { x: 0, y: 0 },
@@ -441,6 +478,147 @@ class Powerup {
     ctx.textBaseline = 'top';
     ctx.fillText(this.properties.name, this.x, this.y + 25);
     ctx.restore();
+  }
+}
+
+// Boss Class
+class Boss {
+  constructor() {
+    this.x = canvas.width / 2;
+    this.y = 100;
+    this.health = 100;
+    this.maxHealth = 100;
+    this.sprite = '👹';
+    this.width = 80;
+    this.height = 80;
+    this.phase = 1;
+    this.moveDirection = 1;
+    this.moveSpeed = 2;
+    this.lastShootTime = 0;
+    this.shootCooldown = 1000;
+    this.lastMinionSpawn = 0;
+    this.minionSpawnRate = 5000;
+  }
+
+  update() {
+    // Side-to-side movement
+    this.x += this.moveSpeed * this.moveDirection;
+    
+    if (this.x >= canvas.width - 100 || this.x <= 100) {
+      this.moveDirection *= -1;
+    }
+    
+    // Update phase based on health
+    const healthPercent = this.health / this.maxHealth;
+    if (healthPercent > 0.66) {
+      this.phase = 1;
+      this.minionSpawnRate = 99999; // No minions in phase 1
+    } else if (healthPercent > 0.33) {
+      this.phase = 2;
+      this.minionSpawnRate = 5000;
+      this.shootCooldown = 800;
+    } else {
+      this.phase = 3;
+      this.minionSpawnRate = 3000;
+      this.shootCooldown = 600;
+    }
+  }
+
+  draw() {
+    // Draw boss sprite
+    ctx.save();
+    ctx.font = '64px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Boss glow effect
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 30;
+    ctx.fillText(this.sprite, this.x, this.y);
+    ctx.restore();
+    
+    // Draw health bar
+    this.drawHealthBar();
+  }
+
+  drawHealthBar() {
+    const barWidth = 300;
+    const barHeight = 20;
+    const x = (canvas.width - barWidth) / 2;
+    const y = 30;
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x, y, barWidth, barHeight);
+    
+    // Health
+    const healthPercent = this.health / this.maxHealth;
+    ctx.fillStyle = healthPercent > 0.33 ? '#ff4444' : '#ff0000';
+    ctx.fillRect(x, y, barWidth * healthPercent, barHeight);
+    
+    // Border
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, barWidth, barHeight);
+    
+    // Text
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`CORONA KING - ${Math.ceil(this.health)}/${this.maxHealth} HP`, canvas.width / 2, y + barHeight / 2);
+    ctx.restore();
+  }
+
+  shoot() {
+    const currentTime = Date.now();
+    if (currentTime - this.lastShootTime < this.shootCooldown) return;
+    
+    this.lastShootTime = currentTime;
+    
+    if (this.phase === 1) {
+      // Phase 1: Triple shot
+      for (let i = -1; i <= 1; i++) {
+        gameState.enemyBullets.push(new Bullet(
+          this.x + i * 20, this.y + 30, 12, 12,
+          'red', 'black', 2, 'enemy', 'normal', 'diamond'
+        ));
+      }
+    } else if (this.phase === 2) {
+      // Phase 2: Tracking bullets
+      const bullet = new Bullet(this.x, this.y + 30, 14, 14, 'orange', 'black', 2, 'enemy', 'tracking', 'star');
+      bullet.trackingTarget = gameState.player;
+      bullet.trackingSpeed = 0.15;
+      gameState.enemyBullets.push(bullet);
+    } else {
+      // Phase 3: Wall pattern
+      for (let i = 0; i < 5; i++) {
+        const spacing = canvas.width / 6;
+        gameState.enemyBullets.push(new Bullet(
+          spacing * (i + 1), this.y + 30, 10, 10,
+          'purple', 'white', 2, 'enemy', 'normal', 'square'
+        ));
+      }
+    }
+  }
+
+  spawnMinion() {
+    const currentTime = Date.now();
+    if (currentTime - this.lastMinionSpawn < this.minionSpawnRate) return;
+    
+    this.lastMinionSpawn = currentTime;
+    
+    const numMinions = this.phase === 3 ? 3 : 2;
+    for (let i = 0; i < numMinions; i++) {
+      const minion = new TextC(
+        '🦠',
+        this.x + (Math.random() - 0.5) * 200,
+        this.y + 60,
+        CONFIG.ENEMY_FONT_SIZE
+      );
+      gameState.enemies.push(minion);
+    }
   }
 }
 
@@ -834,19 +1012,15 @@ const initializeMobileControls = () => {
 
 // Bullet speeds
 const getCurrentBulletSpeeds = () => {
-  const gameTime = Date.now() - gameState.gameStartTime;
-  const speedIntervals = Math.floor(gameTime / CONFIG.SPEED_INCREASE_INTERVAL);
-
-  const speedMultiplier = Math.min(
-    1 + (speedIntervals * CONFIG.SPEED_INCREASE_RATE),
-    2.0
-  );
-
-  gameState.currentSpeedMultiplier = speedMultiplier;
-
+  const levelConfig = LEVEL_CONFIG[gameState.level - 1];
+  const baseEnemySpeed = levelConfig ? levelConfig.bulletSpeed : 6;
+  
+  // Apply slow motion powerup
+  const slowMultiplier = gameState.player.powerups.slow > Date.now() ? 0.5 : 1.0;
+  
   return {
-    player: Math.min(CONFIG.BULLET_SPEED_PLAYER * speedMultiplier, 20),
-    enemy: Math.min(CONFIG.BULLET_SPEED_ENEMY * speedMultiplier, 12)
+    player: CONFIG.BULLET_SPEED_PLAYER,
+    enemy: baseEnemySpeed * slowMultiplier
   };
 };
 
@@ -1105,6 +1279,139 @@ const createEnemies = () => {
   return enemies;
 };
 
+// Level System Functions
+const createEnemiesForLevel = (config) => {
+  const enemies = [];
+  const startX = ((canvas.width / 2) / 2) / 2;
+  let currentY = 80;
+  
+  // Filter enemy types based on level config
+  const availableEnemyTypes = ENEMY_TYPES.filter(type => 
+    config.enemyTypes.includes(type.face)
+  );
+  
+  for (let row = 0; row < config.enemyRows; row++) {
+    const enemyType = availableEnemyTypes[row % availableEnemyTypes.length];
+    
+    for (let col = 0; col < config.enemyCols; col++) {
+      const x = col === 0 ? startX : enemies[enemies.length - 1].x + CONFIG.ENEMY_SPACING_X;
+      enemies.push(new TextC(enemyType.face, x, currentY, CONFIG.ENEMY_FONT_SIZE));
+    }
+    
+    currentY += CONFIG.ENEMY_SPACING_Y;
+  }
+  
+  return enemies;
+};
+
+const loadLevel = (levelNum) => {
+  const config = LEVEL_CONFIG[levelNum - 1];
+  
+  if (!config) {
+    console.error('Invalid level:', levelNum);
+    return;
+  }
+  
+  // Update level in gameState
+  gameState.level = levelNum;
+  
+  // Clear existing state
+  gameState.enemies = [];
+  gameState.enemyBullets = [];
+  gameState.powerups = [];
+  
+  if (config.isBoss) {
+    // Boss level
+    gameState.isBossLevel = true;
+    gameState.boss = new Boss();
+  } else {
+    // Normal level
+    gameState.isBossLevel = false;
+    gameState.boss = null;
+    gameState.enemies = createEnemiesForLevel(config);
+  }
+  
+  // Reset enemy shoot interval
+  if (gameState.enemyShootInterval) {
+    clearInterval(gameState.enemyShootInterval);
+  }
+  
+  gameState.enemyShootInterval = setInterval(() => {
+    if (!gameState.isRunning) return;
+    
+    const shootCount = Math.min(6, gameState.enemies.length);
+    for (let i = 0; i < shootCount; i++) {
+      const randomEnemy = gameState.enemies[Math.floor(Math.random() * gameState.enemies.length)];
+      setTimeout(() => {
+        enemyShoot(randomEnemy);
+      }, i * 1000);
+    }
+  }, config.shootInterval || CONFIG.ENEMY_SHOOT_INTERVAL);
+  
+  // Update HUD to reflect new level
+  if (gameState.hudElements.levelDisplay) {
+    gameState.hudElements.levelDisplay.textContent = levelNum;
+  }
+};
+
+const showLevelTransition = (levelNum) => {
+  const messages = [
+    '',
+    'LEVEL 2: Infection Spreads',
+    'LEVEL 3: Pandemic Mode',
+    'LEVEL 4: Critical Condition',
+    'LEVEL 5: Final Defense',
+    'BOSS FIGHT: Corona King!'
+  ];
+  
+  const message = messages[levelNum - 1] || `Level ${levelNum}`;
+  if (message) {
+    createScoreText(
+      canvas.width / 2,
+      canvas.height / 2,
+      message,
+      false
+    );
+  }
+};
+
+const advanceLevel = () => {
+  if (gameState.levelComplete) return; // Prevent multiple calls
+  gameState.levelComplete = true;
+  
+  gameState.level++;
+  
+  if (gameState.level > gameState.maxLevel) {
+    // Final victory!
+    endGame(true);
+    return;
+  }
+  
+  // Show transition message
+  showLevelTransition(gameState.level);
+  
+  // Load next level after delay
+  setTimeout(() => {
+    gameState.levelComplete = false;
+    loadLevel(gameState.level);
+  }, 2500);
+};
+
+const checkLevelComplete = () => {
+  if (gameState.isBossLevel) {
+    // Boss defeated
+    if (gameState.boss && gameState.boss.health <= 0) {
+      gameState.boss = null;
+      advanceLevel();
+    }
+  } else {
+    // All enemies cleared
+    if (gameState.enemies.length === 0) {
+      advanceLevel();
+    }
+  }
+};
+
 const checkCollision = (rect1, rect2) =>
   rect1.x < rect2.x + 38 &&
   rect1.x + rect1.width > rect2.x &&
@@ -1132,13 +1439,7 @@ const calculateScore = (enemy) => {
   return totalPoints;
 };
 
-const updateLevel = () => {
-  // Update level based on enemies defeated
-  const initialEnemyCount = CONFIG.ENEMY_ROWS * CONFIG.ENEMY_COLS;
-  const enemiesRemaining = gameState.enemies.length;
-  const enemiesDefeated = initialEnemyCount - enemiesRemaining;
-  gameState.level = Math.max(1, Math.floor(enemiesDefeated / 10) + 1);
-};
+// Level display update moved to loadLevel function
 
 const createScoreText = (x, y, points, isCombo = false) => {
   const color = isCombo ? '#ffd700' : '#ffffff';
@@ -1164,8 +1465,17 @@ const updateScoreTexts = () => {
 };
 
 const spawnPowerup = (x, y) => {
-  // 15% chance to drop a powerup
-  if (Math.random() > 0.15) return;
+  // Level-based drop rate
+  let dropChance = 0.15; // 15% for levels 1-2
+  if (gameState.level >= 5) {
+    dropChance = 0.25; // 25% for level 5
+  } else if (gameState.level >= 3) {
+    dropChance = 0.20; // 20% for levels 3-4
+  }
+  
+  // Boss minions always drop powerups
+  const isBossMinion = gameState.isBossLevel;
+  if (!isBossMinion && Math.random() > dropChance) return;
   
   const types = ['rapid', 'multi', 'shield', 'slow'];
   const randomType = types[Math.floor(Math.random() * types.length)];
@@ -1191,6 +1501,8 @@ const handleEnemyHit = (bulletIndex, enemyIndex) => {
     const currentIndex = gameState.enemies.indexOf(enemy);
     if (currentIndex !== -1) {
       gameState.enemies.splice(currentIndex, 1);
+      // Check if level is complete
+      checkLevelComplete();
     }
   }, enemy.deathDuration);
 };
@@ -1258,29 +1570,24 @@ const shootBullet = () => {
 
 // Enemy Movement
 const updateEnemyMovement = () => {
-  const currentTime = Date.now();
-  const timeElapsed = (currentTime - gameState.gameStartTime) / 1000;
-  const speedIncrease = Math.floor(timeElapsed / (CONFIG.SPEED_INCREASE_INTERVAL / 1000)) * CONFIG.SPEED_INCREASE_RATE;
-  const enemyCount = gameState.enemies.length;
-  const totalEnemies = CONFIG.ENEMY_ROWS * CONFIG.ENEMY_COLS;
-  const enemyRatio = enemyCount / totalEnemies;
-
+  const levelConfig = LEVEL_CONFIG[gameState.level - 1];
+  const baseSpeed = levelConfig ? levelConfig.enemySpeed : 2;
+  
   // Apply slow motion powerup effect
   const hasSlowMotion = gameState.player.powerups.slow > Date.now();
   const slowMultiplier = hasSlowMotion ? 0.5 : 1.0;
-
-  const speedMultiplier = (1.0 + speedIncrease + (1 - enemyRatio) * 0.2) * slowMultiplier;
-  const baseSpeed = CONFIG.ENEMY_MOVE_SPEED * speedMultiplier;
+  
+  const finalSpeed = baseSpeed * slowMultiplier;
 
   gameState.enemies.forEach((enemy, index) => {
-    enemy.x += baseSpeed * gameState.enemyDirection;
+    enemy.x += finalSpeed * gameState.enemyDirection;
 
     if (enemy.isDying) {
       enemy.draw();
       return;
     }
 
-    if (enemy.x + baseSpeed + 45 > canvas.width || enemy.x + baseSpeed <= 0) {
+    if (enemy.x + finalSpeed + 45 > canvas.width || enemy.x + finalSpeed <= 0) {
       if (Date.now() - (gameState.enemyMovementState?.lastDirectionChange || 0) > 1000) {
         gameState.enemyDirection = -gameState.enemyDirection;
         gameState.enemyMovementState = { ...gameState.enemyMovementState, lastDirectionChange: Date.now() };
@@ -1433,7 +1740,7 @@ const endGame = (victory) => {
   gameState.isRunning = false;
   gameState.isGameOver = true;
   gameState.victory = victory;
-  gameState.gameOverText = victory ? 'VICTORY!' : 'GAME OVER';
+  gameState.gameOverText = victory ? 'YOU SAVED THE WORLD!' : 'GAME OVER';
 
   clearInterval(gameState.enemyShootInterval);
 
@@ -1486,7 +1793,6 @@ const resetGame = () => {
   initializeBackground();
 
   Object.assign(gameState, {
-    enemies: createEnemies(),
     playerBullets: [],
     enemyBullets: [],
     powerups: [],
@@ -1495,30 +1801,21 @@ const resetGame = () => {
     isRunning: true,
     isGameOver: false,
     level: 1,
+    isBossLevel: false,
+    boss: null,
+    levelComplete: false,
     scoring: { score: 0, comboCount: 0, lastKillTime: 0, totalKills: 0, scoreTexts: [] },
     enemyDirection: 1,
     enemyMovementState: {
       lastDirectionChange: 0
     },
-    gameStartTime: Date.now(),
-    currentSpeedMultiplier: 1.0
+    gameStartTime: Date.now()
   });
+  
+  // Load level 1
+  loadLevel(1);
 
   hideGameOverScreen();
-
-  setTimeout(() => {
-    gameState.enemyShootInterval = setInterval(() => {
-      if (!gameState.isRunning) return;
-
-      const shootCount = Math.min(6, gameState.enemies.length);
-      for (let i = 0; i < shootCount; i++) {
-        const randomEnemy = gameState.enemies[Math.floor(Math.random() * gameState.enemies.length)];
-        setTimeout(() => {
-          enemyShoot(randomEnemy);
-        }, i * 1000);
-      }
-    }, CONFIG.ENEMY_SHOOT_INTERVAL);
-  }, CONFIG.ENEMY_SHOOT_DELAY);
 };
 
 
@@ -1592,7 +1889,7 @@ const drawPowerupStatus = () => {
 
 const updateHUD = () => {
   try {
-    updateLevel();
+    // Level updates now happen in checkLevelComplete()
     const updates = {
       scoreDisplay: () => gameState.hudElements.scoreDisplay.textContent = gameState.scoring.score,
       levelDisplay: () => gameState.hudElements.levelDisplay.textContent = gameState.level,
@@ -1707,6 +2004,18 @@ const gameLoop = (currentTime) => {
     }
   });
 
+  // Boss update and rendering
+  if (gameState.isBossLevel && gameState.boss) {
+    gameState.boss.update();
+    gameState.boss.draw();
+    
+    // Boss shooting
+    gameState.boss.shoot();
+    
+    // Boss spawn minions
+    gameState.boss.spawnMinion();
+  }
+
   // Update and draw player bullets (reverse iteration to handle splicing)
   for (let bulletIndex = gameState.playerBullets.length - 1; bulletIndex >= 0; bulletIndex--) {
     const bullet = gameState.playerBullets[bulletIndex];
@@ -1716,6 +2025,31 @@ const gameLoop = (currentTime) => {
     if (bullet.y < 0) {
       gameState.playerBullets.splice(bulletIndex, 1);
       continue;
+    }
+
+    // Check collision with boss
+    if (gameState.isBossLevel && gameState.boss) {
+      const bossHitbox = {
+        x: gameState.boss.x - 40,
+        y: gameState.boss.y - 32,
+        width: 80,
+        height: 64
+      };
+      
+      if (checkCollision(bullet, bossHitbox)) {
+        bullet.createHitEffect();
+        gameState.boss.health -= 2; // 2 damage per hit, 50 hits to defeat
+        gameState.playerBullets.splice(bulletIndex, 1);
+        
+        // Check if boss is defeated
+        if (gameState.boss.health <= 0) {
+          const points = 1000;
+          createScoreText(gameState.boss.x, gameState.boss.y, points, true);
+          gameState.scoring.score += points;
+          checkLevelComplete();
+        }
+        continue;
+      }
     }
 
     // Check collision with enemies
@@ -1986,23 +2320,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeMobileControls();
   initializeBackground();
 
-  // Initialize enemies
-  gameState.enemies = createEnemies();
-
-  // Start enemy shooting
-  setTimeout(() => {
-    gameState.enemyShootInterval = setInterval(() => {
-      if (!gameState.isRunning) return;
-
-      const shootCount = Math.min(6, gameState.enemies.length);
-      for (let i = 0; i < shootCount; i++) {
-        const randomEnemy = gameState.enemies[Math.floor(Math.random() * gameState.enemies.length)];
-        setTimeout(() => {
-          enemyShoot(randomEnemy);
-        }, i * 1000);
-      }
-    }, CONFIG.ENEMY_SHOOT_INTERVAL);
-  }, CONFIG.ENEMY_SHOOT_DELAY);
+  // Load level 1
+  loadLevel(1);
 
   requestAnimationFrame(gameLoop);
 });
