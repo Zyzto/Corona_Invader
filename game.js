@@ -1746,6 +1746,8 @@ const handlePlayerHit = () => {
 const endGame = (victory) => {
   if (gameState.isGameOver) return;
 
+  console.log('endGame called with victory=', victory, 'current level=', gameState.level);
+  
   gameState.isRunning = false;
   gameState.isGameOver = true;
   gameState.victory = victory;
