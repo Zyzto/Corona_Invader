@@ -155,6 +155,15 @@ const gameState = {
   isBossLevel: false,
   boss: null,
   levelComplete: false,
+  bossDefeatAttempt: false,
+  buttonsShown: false,
+  victoryAnimation: {
+    active: false,
+    phase: 0, // 0: vibrate, 1: explode, 2: laser, 3: winner text
+    timer: 0,
+    explosionParticles: [],
+    laserX: 0
+  },
   gameStartTime: Date.now(),
   currentSpeedMultiplier: 1.0,
   mouse: { x: 0, y: 0 },
@@ -498,29 +507,88 @@ class Boss {
     this.shootCooldown = 1000;
     this.lastMinionSpawn = 0;
     this.minionSpawnRate = 5000;
+    
+    // Smooth movement parameters
+    this.targetX = this.x;
+    this.targetY = this.y;
+    this.moveTime = 0;
+    this.nextMoveTime = Date.now() + 2000;
+    
+    // Tracking bullet control
+    this.trackingBurstStart = 0;
+    this.trackingBurstActive = false;
+    this.lastTrackingBurst = Date.now();
   }
 
   update() {
-    // Side-to-side movement
-    this.x += this.moveSpeed * this.moveDirection;
+    const currentTime = Date.now();
     
-    if (this.x >= canvas.width - 100 || this.x <= 100) {
-      this.moveDirection *= -1;
+    // Smooth movement through top region
+    if (currentTime >= this.nextMoveTime) {
+      // Pick a new random position in the top region
+      this.targetX = 100 + Math.random() * (canvas.width - 200);
+      this.targetY = 80 + Math.random() * 120; // Move between y: 80-200
+      this.nextMoveTime = currentTime + 3000 + Math.random() * 2000; // 3-5 seconds
     }
     
+    // Smoothly interpolate to target position
+    this.x += (this.targetX - this.x) * 0.02;
+    this.y += (this.targetY - this.y) * 0.02;
+    
     // Update phase based on health
-    const healthPercent = this.health / this.maxHealth;
-    if (healthPercent > 0.66) {
-      this.phase = 1;
-      this.minionSpawnRate = 99999; // No minions in phase 1
-    } else if (healthPercent > 0.33) {
-      this.phase = 2;
-      this.minionSpawnRate = 5000;
-      this.shootCooldown = 800;
+    // (Only allow auto-switch if phase hasn't been manually set, or if there's a significant health mismatch)
+    if (!this.manualPhase) {
+      const healthPercent = this.health / this.maxHealth;
+      if (healthPercent > 0.66) {
+        this.phase = 1;
+        this.minionSpawnRate = 99999; // No minions in phase 1
+      } else if (healthPercent > 0.33) {
+        this.phase = 2;
+        this.minionSpawnRate = 5000;
+        this.shootCooldown = 800;
+        
+        // Tracking burst control: 5 seconds active every 15 seconds
+        if (!this.trackingBurstActive && currentTime - this.lastTrackingBurst >= 15000) {
+          this.trackingBurstActive = true;
+          this.trackingBurstStart = currentTime;
+        }
+        
+        if (this.trackingBurstActive && currentTime - this.trackingBurstStart >= 5000) {
+          this.trackingBurstActive = false;
+          this.lastTrackingBurst = currentTime;
+        }
+      } else {
+        this.phase = 3;
+        this.minionSpawnRate = 3000;
+        this.shootCooldown = 600;
+      }
     } else {
-      this.phase = 3;
-      this.minionSpawnRate = 3000;
-      this.shootCooldown = 600;
+      // Even with manual phase set, allow health-based phase advancement if health drops below 50
+      const healthPercent = this.health / this.maxHealth;
+      
+      // Check if boss health is below 50 - force phase based on health
+      if (this.health <= 50) {
+        let expectedPhase;
+        if (this.health > 33) {
+          expectedPhase = 2; // Phase 2: 33-50 health
+        } else {
+          expectedPhase = 3; // Phase 3: 0-33 health
+        }
+        
+        // Only change phase if current phase doesn't match expected for this health
+        if (this.phase !== expectedPhase) {
+          this.phase = expectedPhase;
+          
+          // Update phase-specific settings
+          if (expectedPhase === 2) {
+            this.minionSpawnRate = 5000;
+            this.shootCooldown = 800;
+          } else if (expectedPhase === 3) {
+            this.minionSpawnRate = 3000;
+            this.shootCooldown = 600;
+          }
+        }
+      }
     }
   }
 
@@ -577,6 +645,9 @@ class Boss {
     
     this.lastShootTime = currentTime;
     
+    // Track shot pattern for phase 3 mixing
+    if (!this.shotPattern) this.shotPattern = 0;
+    
     if (this.phase === 1) {
       // Phase 1: Triple shot
       for (let i = -1; i <= 1; i++) {
@@ -586,20 +657,75 @@ class Boss {
         ));
       }
     } else if (this.phase === 2) {
-      // Phase 2: Tracking bullets
-      const bullet = new Bullet(this.x, this.y + 30, 14, 14, 'orange', 'black', 2, 'enemy', 'tracking', 'star');
-      bullet.trackingTarget = gameState.player;
-      bullet.trackingSpeed = 0.15;
-      gameState.enemyBullets.push(bullet);
-    } else {
-      // Phase 3: Wall pattern
-      for (let i = 0; i < 5; i++) {
-        const spacing = canvas.width / 6;
-        gameState.enemyBullets.push(new Bullet(
-          spacing * (i + 1), this.y + 30, 10, 10,
-          'purple', 'white', 2, 'enemy', 'normal', 'square'
-        ));
+      // Phase 2: Mix tracking bullets and triple shots
+      // Shoot tracking bullets more frequently in phase 2
+      if (!this.shotPattern) this.shotPattern = 0;
+      const patternNum = this.shotPattern % 3;
+      
+      if (patternNum === 0) {
+        // Tracking bullet
+        const bullet = new Bullet(this.x, this.y + 30, 14, 14, 'orange', 'black', 2, 'enemy', 'tracking', 'star');
+        bullet.trackingTarget = gameState.player;
+        bullet.trackingSpeed = 0.25; // Faster tracking adjustment
+        gameState.enemyBullets.push(bullet);
+      } else {
+        // Triple shot
+        for (let i = -1; i <= 1; i++) {
+          gameState.enemyBullets.push(new Bullet(
+            this.x + i * 20, this.y + 30, 12, 12,
+            'red', 'black', 2, 'enemy', 'normal', 'diamond'
+          ));
+        }
       }
+      
+      this.shotPattern++;
+    } else {
+      // Phase 3: Mix all patterns (wall, spread, tracking, spiral)
+      const patternNum = this.shotPattern % 4;
+      
+      if (patternNum === 0) {
+        // Wall pattern
+        for (let i = 0; i < 5; i++) {
+          const spacing = canvas.width / 6;
+          gameState.enemyBullets.push(new Bullet(
+            spacing * (i + 1), this.y + 30, 10, 10,
+            'purple', 'white', 2, 'enemy', 'normal', 'square'
+          ));
+        }
+      } else if (patternNum === 1) {
+        // Spread pattern (5 bullets fan)
+        for (let i = -2; i <= 2; i++) {
+          const angle = (i * 0.2) + Math.PI / 2;
+          gameState.enemyBullets.push(new Bullet(
+            this.x, this.y + 30, 12, 12,
+            'magenta', 'white', 2, 'enemy', 'normal', 'diamond'
+          ));
+        }
+      } else if (patternNum === 2) {
+        // Tracking bullet
+        const bullet = new Bullet(this.x, this.y + 30, 14, 14, 'orange', 'black', 2, 'enemy', 'tracking', 'star');
+        bullet.trackingTarget = gameState.player;
+        bullet.trackingSpeed = 0.25;
+        gameState.enemyBullets.push(bullet);
+      } else {
+        // Spiral pattern - spread from boss
+        for (let i = 0; i < 8; i++) {
+          const angle = (i * Math.PI * 2 / 8);
+          const spawnRadius = 40; // Further from boss
+          const bullet = new Bullet(
+            this.x + Math.cos(angle) * spawnRadius, 
+            this.y + Math.sin(angle) * spawnRadius, 
+            10, 10,
+            'cyan', 'white', 2, 'enemy', 'normal', 'circle'
+          );
+          // Set initial velocity to continue outward
+          bullet.vx = Math.cos(angle) * 2;
+          bullet.vy = Math.sin(angle) * 2;
+          gameState.enemyBullets.push(bullet);
+        }
+      }
+      
+      this.shotPattern++;
     }
   }
 
@@ -796,7 +922,8 @@ class Bullet extends RectangleObj {
     super(x, y, width, height, fillColor, strokeColor, strokeWidth);
     Object.assign(this, {
       type, behavior, shape, trail: [], maxTrailLength: 5, particles: [],
-      trackingTarget: null, trackingSpeed: 0.1, angle: 0
+      trackingTarget: null, trackingSpeed: 0.1, angle: 0,
+      vx: undefined, vy: undefined // Initialize custom velocities as undefined
     });
   }
 
@@ -826,7 +953,19 @@ class Bullet extends RectangleObj {
         burst: () => this.updateBurstBullet(speeds.enemy)
       };
 
-      (behaviors[this.behavior] || (() => this.y += speeds.enemy))();
+      // If custom velocity is set, use it (for spiral bullets)
+      // Only use custom velocity if explicitly set (not undefined)
+      if (typeof this.vx === 'number' && typeof this.vy === 'number') {
+        // Ensure bullets always move downward on screen
+        const effectiveVy = Math.max(this.vy, 0); // Never negative for enemy bullets
+        this.x += this.vx;
+        this.y += effectiveVy;
+        
+        // Add base downward movement to spiral bullets
+        this.y += speeds.enemy * 0.3;
+      } else {
+        (behaviors[this.behavior] || (() => this.y += speeds.enemy))();
+      }
     }
 
     this.particles = this.particles.filter(particle => {
@@ -846,13 +985,33 @@ class Bullet extends RectangleObj {
 
       this.angle += (targetAngle - this.angle) * this.trackingSpeed;
 
-      this.x += Math.cos(this.angle) * speed;
-      this.y += Math.sin(this.angle) * speed;
-
-      if (this.y > canvas.height - 50) {
-        this.trackingTarget = null;
-        this.behavior = 'tracking_fixed';
+      // Increase speed for tracking bullets to prevent clustering
+      const enhancedSpeed = speed * 1.3;
+      
+      // Always ensure downward movement on lower half of screen
+      const currentAngle = this.angle;
+      const isOnLowerHalf = this.y > canvas.height / 2;
+      
+      if (isOnLowerHalf) {
+        // Force downward angle with some horizontal tracking
+        const correctedAngle = Math.min(Math.max(currentAngle, Math.PI * 0.3), Math.PI * 0.7);
+        this.x += Math.cos(correctedAngle) * enhancedSpeed;
+        this.y += Math.sin(correctedAngle) * enhancedSpeed;
+      } else {
+        this.x += Math.cos(this.angle) * enhancedSpeed;
+        this.y += Math.sin(this.angle) * enhancedSpeed;
       }
+
+      // If bullet hits bottom, remove it
+      if (this.y >= canvas.height - 10) {
+        this.trackingTarget = null;
+        return; // Mark for removal
+      }
+    } else {
+      // Continue falling in same direction if target lost
+      const enhancedSpeed = speed * 1.5;
+      this.x += Math.cos(this.angle) * enhancedSpeed;
+      this.y += Math.sin(this.angle) * enhancedSpeed;
     }
   }
 
@@ -1750,6 +1909,27 @@ const handlePlayerHit = () => {
   }, CONFIG.INVULNERABILITY_TIME);
 
   if (gameState.player.lives <= 0) {
+    // Check if in boss level - give 2nd chance
+    if (gameState.isBossLevel && !gameState.bossDefeatAttempt) {
+      console.log('Boss fight first attempt failed - respawning player for 2nd chance');
+      gameState.bossDefeatAttempt = true;
+      gameState.player.lives = 3; // Reset lives for 2nd attempt
+      gameState.player.isInvulnerable = true;
+      
+      // Reset boss to full health
+      if (gameState.boss) {
+        gameState.boss.health = gameState.boss.maxHealth;
+        gameState.boss.phase = 1;
+        gameState.boss.manualPhase = false;
+      }
+      
+      setTimeout(() => {
+        gameState.player.isInvulnerable = false;
+      }, CONFIG.INVULNERABILITY_TIME);
+      
+      return; // Don't end game, just restart the boss fight
+    }
+    
     endGame(false);
   }
 };
@@ -1763,6 +1943,29 @@ const endGame = (victory) => {
   gameState.isGameOver = true;
   gameState.victory = victory;
   gameState.gameOverText = victory ? 'YOU SAVED THE WORLD!' : 'GAME OVER';
+  
+  // Start victory animation if boss was defeated
+  if (victory && gameState.isBossLevel) {
+    gameState.victoryAnimation.active = true;
+    gameState.victoryAnimation.phase = 0;
+    gameState.victoryAnimation.timer = Date.now();
+    gameState.victoryAnimation.explosionParticles = [];
+    gameState.victoryAnimation.laserX = -canvas.width;
+    
+    // Create explosion particles around boss
+    for (let i = 0; i < 50; i++) {
+      gameState.victoryAnimation.explosionParticles.push({
+        x: gameState.boss.x,
+        y: gameState.boss.y,
+        vx: (Math.random() - 0.5) * 10,
+        vy: (Math.random() - 0.5) * 10,
+        life: 60,
+        maxLife: 60,
+        size: Math.random() * 8 + 4,
+        color: ['#ff0000', '#ffaa00', '#ffff00', '#ffffff'][Math.floor(Math.random() * 4)]
+      });
+    }
+  }
 
   clearInterval(gameState.enemyShootInterval);
 
@@ -1958,15 +2161,21 @@ const gameLoop = (currentTime) => {
       drawBackground();
       updateBackground();
 
-      ctx.font = '168px';
-      ctx.fillStyle = gameState.victory ? 'green' : 'red';
-      ctx.fillText(gameState.gameOverText, (canvas.width / 2) - 200, canvas.height / 2);
+      // Victory animation for boss defeat
+      if (gameState.victory && gameState.victoryAnimation.active) {
+        drawVictoryAnimation();
+      } else {
+        // Regular game over (not victory)
+        ctx.font = '168px';
+        ctx.fillStyle = gameState.victory ? 'green' : 'red';
+        ctx.fillText(gameState.gameOverText, (canvas.width / 2) - 200, canvas.height / 2);
 
-      ctx.font = '48px';
-      ctx.fillStyle = 'white';
-      const timeSurvived = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
-      ctx.fillText(`Score: ${gameState.scoring.score}`, (canvas.width / 2) - 100, canvas.height / 2 + 100);
-      ctx.fillText(`Time Survived: ${timeSurvived}s`, (canvas.width / 2) - 150, canvas.height / 2 + 160);
+        ctx.font = '48px';
+        ctx.fillStyle = 'white';
+        const timeSurvived = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
+        ctx.fillText(`Score: ${gameState.scoring.score}`, (canvas.width / 2) - 100, canvas.height / 2 + 100);
+        ctx.fillText(`Time Survived: ${timeSurvived}s`, (canvas.width / 2) - 150, canvas.height / 2 + 160);
+      }
     }
     return;
   }
@@ -2010,21 +2219,23 @@ const gameLoop = (currentTime) => {
   updateEnemyMovement();
 
   // Update and draw enemy bullets
-  gameState.enemyBullets.forEach((bullet, index) => {
+  // Use reverse iteration to avoid desync when removing bullets
+  for (let i = gameState.enemyBullets.length - 1; i >= 0; i--) {
+    const bullet = gameState.enemyBullets[i];
     bullet.update();
     bullet.draw();
 
     if (bullet.y > canvas.height) {
-      gameState.enemyBullets.splice(index, 1);
-      return;
+      gameState.enemyBullets.splice(i, 1);
+      continue;
     }
 
     if (checkCollision(bullet, { x: gameState.player.x, y: gameState.player.y, width: 38, height: 32 })) {
       bullet.createHitEffect();
       handlePlayerHit();
-      gameState.enemyBullets.splice(index, 1);
+      gameState.enemyBullets.splice(i, 1);
     }
-  });
+  }
 
   // Boss update and rendering
   if (gameState.isBossLevel && gameState.boss) {
@@ -2068,6 +2279,7 @@ const gameLoop = (currentTime) => {
           const points = 1000;
           createScoreText(gameState.boss.x, gameState.boss.y, points, true);
           gameState.scoring.score += points;
+          gameState.boss.manualPhase = false; // Reset manual phase flag
           checkLevelComplete();
         }
         continue;
@@ -2123,6 +2335,11 @@ const gameLoop = (currentTime) => {
 const restartGame = () => {
   hideGameOverScreen();
   resetGame();
+};
+
+// Global main menu function
+const goToMainMenu = () => {
+  window.location.href = 'index.html';
 };
 
 // Event Listeners
@@ -2303,6 +2520,93 @@ const killAllEnemies = () => {
   checkLevelComplete();
 };
 
+const skipToBoss = () => {
+  console.log('DEBUG: Skipping to boss level');
+  
+  // Set level to 6 (boss level)
+  gameState.level = 6;
+  gameState.levelComplete = false;
+  
+  // Load boss level
+  loadLevel(6);
+};
+
+const testBossPhase = (phase) => {
+  if (!gameState.isBossLevel || !gameState.boss) {
+    console.log('DEBUG: Not in boss level yet');
+    return;
+  }
+  
+  console.log(`DEBUG: Setting boss to phase ${phase}`);
+  
+  // Calculate health based on phase
+  let healthPercent;
+  if (phase === 1) {
+    healthPercent = 0.9; // 90% - phase 1
+  } else if (phase === 2) {
+    healthPercent = 0.5; // 50% - phase 2
+  } else if (phase === 3) {
+    healthPercent = 0.15; // 15% - phase 3
+  }
+  
+  gameState.boss.health = gameState.boss.maxHealth * healthPercent;
+  gameState.boss.phase = phase;
+  gameState.boss.manualPhase = true; // Prevent automatic phase switching
+  
+  // Force minion spawn rates and other phase-specific settings
+  if (phase === 1) {
+    gameState.boss.minionSpawnRate = 99999;
+    gameState.boss.shootCooldown = 1000;
+    gameState.boss.trackingBurstActive = false;
+  } else if (phase === 2) {
+    gameState.boss.minionSpawnRate = 5000;
+    gameState.boss.shootCooldown = 800;
+    gameState.boss.lastTrackingBurst = Date.now() - 10000; // Allow tracking burst soon
+    gameState.boss.trackingBurstActive = false;
+  } else if (phase === 3) {
+    gameState.boss.minionSpawnRate = 3000;
+    gameState.boss.shootCooldown = 600;
+    gameState.boss.trackingBurstActive = false;
+  }
+  
+  console.log(`Boss health set to ${Math.ceil(gameState.boss.health)}/${gameState.boss.maxHealth} (${(healthPercent * 100).toFixed(0)}%)`);
+};
+
+const testVictoryAnimation = () => {
+  console.log('DEBUG: Triggering victory animation');
+  gameState.isRunning = false;
+  gameState.isGameOver = true;
+  gameState.victory = true;
+  gameState.gameOverText = 'VICTORY!';
+  
+  // Initialize boss if not already in boss level
+  if (!gameState.isBossLevel || !gameState.boss) {
+    gameState.isBossLevel = true;
+    gameState.boss = new Boss();
+  }
+  
+  // Start victory animation
+  gameState.victoryAnimation.active = true;
+  gameState.victoryAnimation.phase = 0;
+  gameState.victoryAnimation.timer = Date.now();
+  gameState.victoryAnimation.explosionParticles = [];
+  gameState.victoryAnimation.laserX = -canvas.width;
+  
+  // Create explosion particles
+  for (let i = 0; i < 50; i++) {
+    gameState.victoryAnimation.explosionParticles.push({
+      x: gameState.boss.x,
+      y: gameState.boss.y,
+      vx: (Math.random() - 0.5) * 10,
+      vy: (Math.random() - 0.5) * 10,
+      life: 60,
+      maxLife: 60,
+      size: Math.random() * 8 + 4,
+      color: ['#ff0000', '#ffaa00', '#ffff00', '#ffffff'][Math.floor(Math.random() * 4)]
+    });
+  }
+};
+
 // Setup debug checkboxes
 if (DEBUG_MODE) {
   document.addEventListener('DOMContentLoaded', () => {
@@ -2322,7 +2626,7 @@ if (DEBUG_MODE) {
         }
       });
 
-      // Add keyboard shortcut (F1 to toggle debug panel, K to kill all enemies)
+      // Add keyboard shortcuts
       window.addEventListener('keydown', (e) => {
         if (e.key === 'F1') {
           e.preventDefault();
@@ -2331,10 +2635,124 @@ if (DEBUG_MODE) {
         if (e.key === 'k' || e.key === 'K') {
           killAllEnemies();
         }
+        if (e.key === 'b' || e.key === 'B') {
+          skipToBoss();
+        }
+        // Phase testing (1, 2, 3 keys when boss is active)
+        if (e.key === '1') testBossPhase(1);
+        if (e.key === '2') testBossPhase(2);
+        if (e.key === '3') testBossPhase(3);
+        // Victory animation test
+        if (e.key === 'v' || e.key === 'V') testVictoryAnimation();
       });
     }, 100);
   });
 }
+
+// Victory Animation - Simple 3-phase sequence
+const drawVictoryAnimation = () => {
+  const anim = gameState.victoryAnimation;
+  const elapsed = Date.now() - anim.timer;
+  const bossX = gameState.boss ? gameState.boss.x : canvas.width / 2;
+  const bossY = gameState.boss ? gameState.boss.y : 100;
+  
+  ctx.save();
+  
+  // Phase 0: Boss vibrates and flashes red (0-1s)
+  if (elapsed < 1000) {
+    const shake = Math.sin(elapsed / 30) * 15;
+    const flash = Math.sin(elapsed / 50) * 100;
+    ctx.translate(shake, 0);
+    
+    ctx.font = '80px Arial';
+    ctx.fillStyle = `rgb(255, ${255 - flash}, ${255 - flash})`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 30;
+    ctx.fillText('👹', bossX, bossY);
+    
+    ctx.restore();
+    return;
+  }
+  
+  // Phase 1: Boss explodes with particle burst (1-2.5s)
+  if (elapsed < 2500) {
+    // Update and draw explosion particles
+    anim.explosionParticles = anim.explosionParticles.filter(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      p.life--;
+      return p.life > 0;
+    });
+    
+    anim.explosionParticles.forEach(p => {
+      ctx.save();
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size/2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+    
+    // Bright flash in center
+    const flash = Math.max(0, 1 - (elapsed - 1000) / 1500);
+    ctx.save();
+    ctx.globalAlpha = flash * 0.5;
+    ctx.fillStyle = '#ffff00';
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 50;
+    ctx.beginPath();
+    ctx.arc(bossX, bossY, 60, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    
+    ctx.restore();
+    return;
+  }
+  
+  // Phase 2: Show "WINNER" text with score (2.5s+)
+  ctx.font = 'bold 120px Arial';
+  ctx.fillStyle = '#00ffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#00ffff';
+  ctx.shadowBlur = 50;
+  
+  // Pulsing glow effect
+  const glow = 40 + Math.sin(elapsed / 200) * 10;
+  ctx.shadowBlur = glow;
+  ctx.fillText('WINNER!', canvas.width / 2, canvas.height / 2 - 120);
+  
+  // Score display
+  ctx.font = 'bold 48px Arial';
+  ctx.fillStyle = '#ffff00';
+  ctx.shadowColor = '#ffaa00';
+  ctx.shadowBlur = 20;
+  ctx.fillText(`Final Score: ${gameState.scoring.score}`, canvas.width / 2, canvas.height / 2 - 20);
+  ctx.fillText('YOU SAVED THE WORLD! 🌍✨', canvas.width / 2, canvas.height / 2 + 40);
+  
+  ctx.restore();
+  
+  // Show HTML buttons overlay after animation settles - enable cursor and show buttons
+  if (elapsed > 2500 && !gameState.buttonsShown) {
+    gameState.buttonsShown = true;
+    // Enable cursor for clicking buttons
+    document.body.classList.add('show-cursor');
+    
+    // Show winner screen buttons
+    const winnerButtons = document.getElementById('winner-buttons');
+    if (winnerButtons) {
+      winnerButtons.style.display = 'flex';
+      winnerButtons.style.pointerEvents = 'auto';
+    }
+  }
+};
 
 // Initialize everything
 document.addEventListener('DOMContentLoaded', () => {
