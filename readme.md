@@ -67,8 +67,6 @@ Tip: Press F1 to open the debug panel locally, or append `?debug=true` to the UR
 - Health bar with adaptive behavior per phase
 ![Boss Level](img/boss.png)
 
-How to capture: during gameplay, use your OS screenshot tool. Store images under `docs/levels/*.png` and the links above will render automatically.
-
 ## Resources
 
 - [Emoji reference](https://html-css-js.com/html/character-codes/)
