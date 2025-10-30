@@ -2799,6 +2799,8 @@ if (DEBUG_MODE) {
           e.preventDefault();
           toggleDebugPanel();
         }
+        // Only allow debug shortcuts when the debug panel is enabled/visible
+        if (!gameState.debug.enabled) return;
         if (e.key === 'k' || e.key === 'K') {
           killAllEnemies();
         }
