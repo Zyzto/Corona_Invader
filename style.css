@@ -150,15 +150,12 @@ body::before {
   justify-content: center;
   align-content: center;
   grid-area: middleT;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr 1fr;
-  grid-template-areas:
-    "mouseRightT mouseRightI"
-    "mouseLeftT mouseLeftI"
-    "mouseclickT mouseclickI";
+  display: flex;
+  flex-direction: column;
   gap: 20px;
   z-index: 2;
+  align-items: center;
+  justify-content: center;
 }
 
 .mouse {
@@ -206,32 +203,7 @@ body::before {
   }
 }
 
-#mouseRightI {
-  grid-area: mouseRightI;
-  animation: float-right 2s ease-in-out infinite;
-}
-
-#mouseLeftI {
-  grid-area: mouseLeftI;
-  animation: float-left 2s ease-in-out infinite;
-}
-
-#mouseclickI {
-  grid-area: mouseclickI;
-  animation: scale 2s ease-in-out infinite;
-}
-
-#mouseRightT {
-  grid-area: mouseRightT;
-}
-
-#mouseLeftT {
-  grid-area: mouseLeftT;
-}
-
-#mouseclickT {
-  grid-area: mouseclickT;
-}
+/* Old grid areas removed - now using flex layout */
 
 .slide-in-blurred-right {
   animation: slide-in-blurred-right 0.8s cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -331,17 +303,11 @@ body::before {
 /* Responsive design */
 @media (max-width: 768px) {
   #middleT {
-    grid-template-columns: 1fr;
-    grid-template-rows: repeat(3, auto);
-    grid-template-areas:
-      "mouseRightT"
-      "mouseLeftT"
-      "mouseclickT";
     gap: 15px;
   }
   
-  .mouse {
-    display: none;
+  .control-section {
+    padding: 15px;
   }
   
   .mouseT {
@@ -362,5 +328,120 @@ body::before {
   
   #clickMe {
     font-size: 16px;
+  }
+}
+
+/* Control sections styling */
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  padding: 40px;
+}
+
+.control-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  justify-items: center;
+  gap: 30px;
+  padding: 20px;
+  background: linear-gradient(90deg, rgba(0, 255, 255, 0.05), transparent);
+  border-left: 3px solid rgba(0, 255, 255, 0.3);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.control-item:hover {
+  background: linear-gradient(90deg, rgba(0, 255, 255, 0.1), transparent);
+  border-left-color: rgba(0, 255, 255, 0.6);
+  transform: translateX(5px);
+}
+
+.control-desc {
+  text-align: left;
+  font-size: clamp(20px, 3vw, 36px);
+  font-weight: 700;
+  font-family: 'Orbitron', monospace;
+  background: linear-gradient(45deg, #00ff00, #ffff00, #00ffff);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  -webkit-text-stroke-width: 1px;
+  -webkit-text-stroke-color: rgba(255, 255, 255, 0.3);
+  text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+  animation: textGlow 3s ease-in-out infinite;
+  justify-self: start;
+}
+
+.control-note {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.key-badge {
+  display: inline-block;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.3), rgba(0, 136, 255, 0.3));
+  border: 2px solid rgba(0, 255, 255, 0.6);
+  border-radius: 12px;
+  color: #00ffff;
+  font-size: clamp(18px, 2.5vw, 28px);
+  font-weight: 700;
+  font-family: 'Orbitron', monospace;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
+  min-width: 180px;
+  text-align: center;
+  box-shadow: 
+    inset 0 0 20px rgba(0, 255, 255, 0.2),
+    0 0 30px rgba(0, 255, 255, 0.4);
+  animation: keyGlow 2s ease-in-out infinite;
+  justify-self: end;
+}
+
+@keyframes keyGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+  }
+}
+
+.key-note {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: clamp(14px, 2vw, 18px);
+  font-style: italic;
+  text-align: center;
+  margin-top: 5px;
+  opacity: 0.8;
+}
+
+/* Responsive for control items */
+@media (max-width: 768px) {
+  .control-section {
+    padding: 20px 15px;
+    gap: 20px;
+  }
+  
+  .control-item {
+    gap: 15px;
+    padding: 15px;
+    grid-template-columns: 1fr auto;
+  }
+  
+  .control-desc {
+    font-size: 20px;
+  }
+  
+  .key-badge {
+    min-width: 140px;
+    padding: 10px 16px;
+    font-size: 16px;
+  }
+  
+  .key-note {
+    font-size: 14px;
   }
 }

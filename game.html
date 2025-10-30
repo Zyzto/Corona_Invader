@@ -258,12 +258,16 @@
       /* Mobile Controls */
       .mobile-controls {
         position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
         display: none;
-        gap: 10px;
         z-index: 1000;
+        pointer-events: none;
+      }
+
+      /* Auto-show controls on mobile devices */
+      @media (max-width: 768px) {
+        .mobile-controls {
+          display: block;
+        }
       }
 
       .mobile-controls.show {
@@ -297,12 +301,65 @@
       }
 
       .mobile-btn.shoot {
+        position: fixed;
+        bottom: 40px;
+        right: 40px;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
         background: rgba(255, 0, 0, 0.3);
-        border-color: rgba(255, 0, 0, 0.6);
+        border: 3px solid rgba(255, 0, 0, 0.6);
+        pointer-events: auto;
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+        padding: 0;
+        min-width: 80px;
+        min-height: 80px;
+        font-size: 24px;
       }
 
       .mobile-btn.shoot:active {
-        background: rgba(255, 0, 0, 0.5);
+        background: rgba(255, 0, 0, 0.6);
+        box-shadow: 0 0 30px rgba(255, 0, 0, 0.6);
+        transform: scale(0.9);
+      }
+
+      /* Virtual Joystick */
+      .joystick-container {
+        position: fixed;
+        bottom: 40px;
+        left: 40px;
+        width: 120px;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: auto;
+      }
+
+      .joystick-base {
+        position: absolute;
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        border: 3px solid rgba(255, 255, 255, 0.4);
+        box-shadow: 
+          inset 0 0 20px rgba(0, 0, 0, 0.3),
+          0 0 20px rgba(255, 255, 255, 0.2);
+        touch-action: none;
+        user-select: none;
+      }
+
+      .joystick-stick {
+        position: absolute;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.6);
+        border: 3px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        transition: transform 0.1s ease-out;
+        pointer-events: none;
       }
 
       /* Responsive design */
@@ -323,14 +380,47 @@
           padding: 6px 10px;
         }
         
-        .game-over-title {
-          font-size: 36px;
-        }
-        
-        .game-over-score {
-          font-size: 20px;
-        }
+      .game-over-title {
+        font-size: 36px;
       }
+      
+      .game-over-score {
+        font-size: 20px;
+      }
+      
+      .restart-btn {
+        font-size: 16px;
+        padding: 12px 24px;
+        width: 90%;
+        max-width: 280px;
+      }
+      
+      .menu-btn {
+        font-size: 16px;
+        padding: 12px 24px;
+        width: 90%;
+        max-width: 280px;
+      }
+      
+      /* Winner buttons mobile friendly */
+      #winner-buttons {
+        padding-bottom: 100px !important;
+        gap: 15px !important;
+      }
+      
+      #winner-buttons button {
+        font-size: 18px !important;
+        padding: 15px 30px !important;
+        min-width: 250px !important;
+        width: 85% !important;
+        max-width: 300px !important;
+      }
+      
+      #controls-instructions {
+        font-size: 12px !important;
+        padding: 0 20px;
+      }
+    }
 
       @media (max-width: 480px) {
         .hud-top {
@@ -351,6 +441,33 @@
         .game-over-score {
           font-size: 18px;
         }
+        
+        .restart-btn {
+          font-size: 14px !important;
+          padding: 12px 20px !important;
+          min-width: 220px !important;
+        }
+        
+        .menu-btn {
+          font-size: 14px !important;
+          padding: 12px 20px !important;
+          min-width: 220px !important;
+        }
+        
+        #winner-buttons {
+          padding-bottom: 80px !important;
+        }
+        
+        #winner-buttons button {
+          font-size: 16px !important;
+          padding: 12px 20px !important;
+          min-width: 220px !important;
+        }
+        
+        #controls-instructions {
+          font-size: 11px !important;
+          padding: 0 15px;
+        }
       }
     </style>
   </head>
@@ -360,6 +477,10 @@
       
       <!-- Winner Screen Buttons Overlay -->
       <div id="winner-buttons" style="position: absolute; bottom: 0; left: 0; width: 100%; height: auto; z-index: 25; pointer-events: none; display: none; flex-direction: column; align-items: center; justify-content: flex-end; padding-bottom: 190px; gap: 20px;">
+        <div id="controls-instructions" style="display: none; text-align: center; color: rgba(255,255,255,0.7); font-size: 14px; margin-bottom: 10px; font-family: 'Roboto', sans-serif; max-width: 400px;">
+          <div id="desktop-instructions">← → arrows or A/D to move, Space to shoot</div>
+          <div id="mobile-instructions" style="display: none;">Use joystick on left to move, FIRE button on right to shoot</div>
+        </div>
         <button class="restart-btn" onclick="restartGame()" tabindex="0" aria-label="Restart the game" style="font-size: 22px; padding: 18px 40px; box-shadow: 0 8px 30px rgba(0, 255, 255, 0.7); border: 3px solid rgba(0, 255, 255, 0.9); min-width: 200px;">RETRY</button>
         <button class="menu-btn" onclick="goToMainMenu()" tabindex="0" aria-label="Go to main menu" style="font-size: 22px; padding: 18px 40px; box-shadow: 0 8px 30px rgba(255, 170, 0, 0.7); border: 3px solid rgba(255, 170, 0, 0.9); min-width: 200px;">MAIN MENU</button>
       </div>
@@ -392,10 +513,13 @@
 
     <!-- Mobile Controls -->
     <div class="mobile-controls" id="mobile-controls" role="toolbar" aria-label="Game Controls">
-      <div class="mobile-btn" id="mobile-left" role="button" tabindex="0" aria-label="Move left">←</div>
-      <div class="mobile-btn" id="mobile-right" role="button" tabindex="0" aria-label="Move right">→</div>
-      <div class="mobile-btn" id="mobile-up" role="button" tabindex="0" aria-label="Move up">↑</div>
-      <div class="mobile-btn" id="mobile-down" role="button" tabindex="0" aria-label="Move down">↓</div>
+      <!-- Virtual Joystick -->
+      <div class="joystick-container">
+        <div class="joystick-base" id="joystick-base"></div>
+        <div class="joystick-stick" id="joystick-stick"></div>
+      </div>
+      
+      <!-- Shoot Button -->
       <div class="mobile-btn shoot" id="mobile-shoot" role="button" tabindex="0" aria-label="Shoot">FIRE</div>
     </div>
 
@@ -427,11 +551,25 @@
       <button onclick="clearAllParticles()" style="width: 100%; background: #ff4444; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-weight: bold;">Clear Particles</button>
       <button onclick="killAllEnemies()" style="width: 100%; background: #ff00ff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-weight: bold;">Kill All Enemies (K)</button>
       <button onclick="skipToBoss()" style="width: 100%; background: #8800ff; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-weight: bold;">Skip to Boss (B)</button>
+      <!-- Level Jump Controls -->
       <div style="margin-top: 10px; border-top: 1px solid #00ffff; padding-top: 10px;">
-        <div style="font-size: 12px; margin-bottom: 5px; color: #ffff00;">Boss Phase Testing</div>
-        <button onclick="testBossPhase(1)" style="width: 30%; background: #00aa00; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Phase 1</button>
-        <button onclick="testBossPhase(2)" style="width: 30%; background: #ffaa00; color: black; border: none; padding: 6px; border-radius: 4px; cursor: pointer; margin-left: 5%; font-size: 12px; font-weight: bold;">Phase 2</button>
-        <button onclick="testBossPhase(3)" style="width: 30%; background: #ff0000; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; margin-left: 5%; font-size: 12px; font-weight: bold;">Phase 3</button>
+        <div style="font-size: 12px; margin-bottom: 8px; color: #00ffff; font-weight: bold;">Level Jump</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          <button onclick="loadLevel(1)" style="flex: 1 0 30%; background: #003344; color: #00ffff; border: 1px solid #00ffff; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Level 1</button>
+          <button onclick="loadLevel(2)" style="flex: 1 0 30%; background: #003344; color: #00ffff; border: 1px solid #00ffff; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Level 2</button>
+          <button onclick="loadLevel(3)" style="flex: 1 0 30%; background: #003344; color: #00ffff; border: 1px solid #00ffff; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Level 3</button>
+          <button onclick="loadLevel(4)" style="flex: 1 0 30%; background: #003344; color: #00ffff; border: 1px solid #00ffff; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Level 4</button>
+          <button onclick="loadLevel(5)" style="flex: 1 0 30%; background: #003344; color: #00ffff; border: 1px solid #00ffff; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Level 5</button>
+          <button onclick="loadLevel(6)" style="flex: 1 0 30%; background: #440000; color: #ff8888; border: 1px solid #ff8888; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Boss (6)</button>
+        </div>
+      </div>
+      <div style="margin-top: 10px; border-top: 1px solid #00ffff; padding-top: 10px;">
+        <div style="font-size: 12px; margin-bottom: 8px; color: #ffff00;">Boss Phase Testing</div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button onclick="testBossPhase(1)" style="flex: 1 0 30%; background: #00aa00; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Phase 1</button>
+          <button onclick="testBossPhase(2)" style="flex: 1 0 30%; background: #ffaa00; color: black; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Phase 2</button>
+          <button onclick="testBossPhase(3)" style="flex: 1 0 30%; background: #ff0000; color: white; border: none; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;">Phase 3</button>
+        </div>
       </div>
       <button onclick="testVictoryAnimation()" style="width: 100%; background: #00ffff; color: #000000; border: none; padding: 8px; border-radius: 4px; cursor: pointer; margin-top: 10px; font-weight: bold;">Test Victory Animation (V)</button>
     </div>

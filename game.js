@@ -1,8 +1,18 @@
 // Corona Invader Game - Functional Refactored Version
 // ============================================
 
-// Debug mode - set to true in dev environment
-const DEBUG_MODE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.search.includes('debug=true');
+// Debug mode - enabled on local hosts (localhost, 127.*, or 192.168.*) or via URL flag (?debug=true)
+const DEBUG_MODE = (() => {
+  const host = window.location.hostname || '';
+  const search = window.location.search || '';
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.startsWith('127.') ||
+    host.startsWith('192.168.') ||
+    search.includes('debug=true')
+  );
+})();
 
 // Canvas initialization
 const canvas = document.querySelector('#canvas');
@@ -51,6 +61,9 @@ const CONFIG = {
   BLINK_DURATION: 100,
   PLAYER_MOVE_SPEED: 8,
   PLAYER_BOUNDARY_MARGIN: 20,
+  // NOTE: SPEED_INCREASE_INTERVAL and SPEED_INCREASE_RATE are legacy values
+  // from the old time-based difficulty system. The game now uses level-based
+  // difficulty progression instead. Kept for reference but not actively used.
   SPEED_INCREASE_INTERVAL: 10000,
   SPEED_INCREASE_RATE: 0.2,
 
@@ -67,6 +80,13 @@ const CONFIG = {
     STAR_SIZE_MAX: 4,
     NEBULA_SIZE_MIN: 80,
     NEBULA_SIZE_MAX: 300
+  },
+
+  PARTICLE_LIMITS: {
+    MAX_ENGINE_PARTICLES: 15,
+    MAX_TRAIL_PARTICLES: 10,
+    MAX_BULLET_PARTICLES: 50,
+    MAX_EXPLOSION_PARTICLES: 100
   }
 };
 
@@ -142,6 +162,7 @@ const gameState = {
     tiltEnabled: true,
     forceShootAnimation: false
   },
+  debugElements: null, // Cache for debug DOM elements
   enemies: [],
   enemyDirection: 1,
   playerBullets: [],
@@ -173,7 +194,10 @@ const gameState = {
   scoring: { score: 0, comboCount: 0, lastKillTime: 0, totalKills: 0, scoreTexts: [] },
   enemyMovementState: {
     lastDirectionChange: 0
-  }
+  },
+  cachedCanvasRect: null,
+  currentLevelConfig: null, // Cache for current level configuration
+  mouseTrackingActive: false // Prevent mouse from interfering with mobile controls
 };
 
 // ============================================
@@ -772,14 +796,22 @@ const createTrailParticle = (x, y) => ({
 });
 
 const updateParticles = (particles) => {
-  return particles.filter(particle => {
+  // Optimized: in-place update with manual filtering for better performance
+  let writeIndex = 0;
+  for (let i = 0; i < particles.length; i++) {
+    const particle = particles[i];
     particle.x += particle.vx;
     particle.y += particle.vy;
     particle.life -= 0.02;
     particle.alpha = particle.life;
     particle.size *= 0.98;
-    return particle.life > 0;
-  });
+    
+    if (particle.life > 0) {
+      particles[writeIndex++] = particle;
+    }
+  }
+  particles.length = writeIndex;
+  return particles;
 };
 
 // Player Visual Effects Class
@@ -805,14 +837,20 @@ class PlayerVisual {
       ctx.translate(-centerX, -centerY);
     }
 
-    // Draw sprite with glow
-    this.drawSprite(ctx, player, centerX, centerY);
-
     // Draw engine flames (draw below the sprite) - only if enabled
     if (!gameState.debug.enabled || gameState.debug.showEngineFlames) {
       this.drawEngineFlames(ctx, player);
     }
 
+    // Draw sprite with glow
+    this.drawSprite(ctx, player, centerX, centerY);
+
+    ctx.restore();
+    
+    // Draw trails and effects OUTSIDE of the rotation transform
+    // This makes them independent - they stay where they were created
+    ctx.save();
+    
     // Draw movement trails - only if enabled
     if (!gameState.debug.enabled || gameState.debug.showTrails) {
       this.drawTrails(ctx, player, centerX, centerY);
@@ -1139,39 +1177,111 @@ const isMobileDevice = () =>
   (navigator.maxTouchPoints > 0);
 
 const initializeMobileControls = () => {
-  if (!isMobileDevice()) return;
+  // Always show mobile controls on mobile devices, regardless of touch capability detection
+  const isMobile = isMobileDevice() || window.innerWidth <= 768;
+  
+  if (!isMobile) return;
 
   const mobileControls = document.getElementById('mobile-controls');
   if (!mobileControls) return;
 
   mobileControls.classList.add('show');
 
-  const controlMappings = [
-    { id: 'mobile-left', keys: ['left', 'a'] },
-    { id: 'mobile-right', keys: ['right', 'd'] },
-    { id: 'mobile-up', keys: ['up', 'w'] },
-    { id: 'mobile-down', keys: ['down', 's'] },
-    { id: 'mobile-shoot', keys: ['space'] }
-  ];
+  // Initialize virtual joystick
+  const joystickBase = document.getElementById('joystick-base');
+  const joystickStick = document.getElementById('joystick-stick');
+  
+  if (joystickBase && joystickStick) {
+    let joystickActive = false;
+    const joystickRadius = 60; // Half the size of the base
+    
+    const startJoystick = (e) => {
+      e.preventDefault();
+      joystickActive = true;
+      navigator.vibrate?.(50);
+      // Disable mouse tracking when joystick is active - this prevents teleportation
+      gameState.mouseTrackingActive = false;
+    };
+    
+    const moveJoystick = (e) => {
+      if (!joystickActive) return;
+      e.preventDefault();
+      
+      const touch = e.touches ? e.touches[0] : e;
+      const rect = joystickBase.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      const deltaX = touch.clientX - centerX;
+      const deltaY = touch.clientY - centerY;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      
+      // Limit stick movement to base circle
+      const limitedDistance = Math.min(distance, joystickRadius);
+      const angle = Math.atan2(deltaY, deltaX);
+      
+      const stickX = Math.cos(angle) * limitedDistance;
+      const stickY = Math.sin(angle) * limitedDistance;
+      
+      joystickStick.style.transform = `translate(${stickX}px, ${stickY}px)`;
+      
+      // Map joystick movement to keys
+      const threshold = joystickRadius * 0.3; // 30% threshold for movement
+      gameState.keys.left = false;
+      gameState.keys.right = false;
+      gameState.keys.up = false;
+      gameState.keys.down = false;
+      
+      if (Math.abs(deltaX) > threshold || Math.abs(deltaY) > threshold) {
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          // Horizontal movement
+          gameState.keys.left = deltaX < -threshold;
+          gameState.keys.right = deltaX > threshold;
+        } else {
+          // Vertical movement
+          gameState.keys.up = deltaY < -threshold;
+          gameState.keys.down = deltaY > threshold;
+        }
+      }
+    };
+    
+    const stopJoystick = (e) => {
+      e.preventDefault();
+      joystickActive = false;
+      joystickStick.style.transform = 'translate(0, 0)';
+      
+      // Clear all movement keys
+      gameState.keys.left = false;
+      gameState.keys.right = false;
+      gameState.keys.up = false;
+      gameState.keys.down = false;
+      // DO NOT re-enable mouse tracking on mobile - this causes the teleport issue
+      // gameState.mouseTrackingActive stays false when joystick is not active
+    };
+    
+    joystickBase.addEventListener('touchstart', startJoystick);
+    joystickBase.addEventListener('touchmove', moveJoystick);
+    joystickBase.addEventListener('touchend', stopJoystick);
+    joystickBase.addEventListener('touchcancel', stopJoystick);
+  }
 
-  controlMappings.forEach(({ id, keys }) => {
-    const element = document.getElementById(id);
-    if (!element) return;
+  // Initialize shoot button
+  const shootButton = document.getElementById('mobile-shoot');
+  if (shootButton) {
+    const setShoot = (value) => gameState.keys.space = value;
+    const vibrate = () => navigator.vibrate?.(100);
 
-    const setKeys = (value) => keys.forEach(key => gameState.keys[key] = value);
-    const vibrate = () => navigator.vibrate?.(keys.includes('space') ? 100 : 50);
-
-    addEventListeners(element, {
-      touchstart: (e) => { e.preventDefault(); setKeys(true); vibrate(); },
-      touchend: (e) => { e.preventDefault(); setKeys(false); },
-      keydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setKeys(true); } }
+    addEventListeners(shootButton, {
+      touchstart: (e) => { e.preventDefault(); setShoot(true); vibrate(); },
+      touchend: (e) => { e.preventDefault(); setShoot(false); }
     });
-  });
+  }
 };
 
 // Bullet speeds
 const getCurrentBulletSpeeds = () => {
-  const levelConfig = LEVEL_CONFIG[gameState.level - 1];
+  // Use cached level config for better performance
+  const levelConfig = gameState.currentLevelConfig || LEVEL_CONFIG[gameState.level - 1];
   const baseEnemySpeed = levelConfig ? levelConfig.bulletSpeed : 6;
   
   // Apply slow motion powerup
@@ -1473,6 +1583,7 @@ const loadLevel = (levelNum) => {
   
   // Update level in gameState
   gameState.level = levelNum;
+  gameState.currentLevelConfig = config; // Cache level config
   
   // Clear existing state
   gameState.enemies = [];
@@ -1543,7 +1654,7 @@ const advanceLevel = () => {
   // Check if we've completed all levels (next level would be level 7, which doesn't exist)
   if (nextLevel > gameState.maxLevel) {
     // Final victory! (only if we completed level 6, the boss)
-    console.log('Victory! Completed level:', gameState.level, 'Max level:', gameState.maxLevel);
+    if (DEBUG_MODE) console.log('Victory! Completed level:', gameState.level, 'Max level:', gameState.maxLevel);
     endGame(true);
     return;
   }
@@ -1568,7 +1679,7 @@ const checkLevelComplete = () => {
   if (gameState.isBossLevel) {
     // Boss defeated
     if (gameState.boss && gameState.boss.health <= 0) {
-      console.log('Boss defeated! Current level:', gameState.level);
+      if (DEBUG_MODE) console.log('Boss defeated! Current level:', gameState.level);
       gameState.boss = null;
       advanceLevel();
     }
@@ -1576,10 +1687,10 @@ const checkLevelComplete = () => {
     // All enemies cleared - must be completely removed from array
     const aliveEnemies = gameState.enemies.filter(e => !e.isDying && e.deathAnimation == null);
     
-    console.log('Checking level complete. Total enemies:', gameState.enemies.length, 'Alive:', aliveEnemies.length);
+    if (DEBUG_MODE) console.log('Checking level complete. Total enemies:', gameState.enemies.length, 'Alive:', aliveEnemies.length);
     
     if (gameState.enemies.length === 0) {
-      console.log('Level complete! Current level:', gameState.level);
+      if (DEBUG_MODE) console.log('Level complete! Current level:', gameState.level);
       advanceLevel();
     }
   }
@@ -1673,15 +1784,19 @@ const handleEnemyHit = (bulletIndex, enemyIndex) => {
   
   // Remove enemy after animation
   setTimeout(() => {
-    const currentIndex = gameState.enemies.indexOf(enemy);
-    if (currentIndex !== -1) {
-      gameState.enemies.splice(currentIndex, 1);
-      console.log('Enemy removed. Remaining:', gameState.enemies.length);
-      
-      // Check if level is complete after enemy is removed
-      setTimeout(() => {
-        checkLevelComplete();
-      }, 50);
+    // Optimized: Store enemy index to avoid O(n) indexOf lookup
+    const currentIndex = enemy.arrayIndex ?? gameState.enemies.indexOf(enemy);
+    if (currentIndex !== -1 && currentIndex < gameState.enemies.length) {
+      // Validate enemy is still the same before removing
+      if (gameState.enemies[currentIndex] === enemy) {
+        gameState.enemies.splice(currentIndex, 1);
+        if (DEBUG_MODE) console.log('Enemy removed. Remaining:', gameState.enemies.length);
+        
+        // Check if level is complete after enemy is removed
+        setTimeout(() => {
+          checkLevelComplete();
+        }, 50);
+      }
     }
   }, enemy.deathDuration || 500);
 };
@@ -1749,7 +1864,8 @@ const shootBullet = () => {
 
 // Enemy Movement
 const updateEnemyMovement = () => {
-  const levelConfig = LEVEL_CONFIG[gameState.level - 1];
+  // Use cached level config instead of looking it up every frame
+  const levelConfig = gameState.currentLevelConfig || LEVEL_CONFIG[gameState.level - 1];
   const baseSpeed = levelConfig ? levelConfig.enemySpeed : 2;
   
   // Apply slow motion powerup effect
@@ -1795,12 +1911,17 @@ const handlePlayerMovement = () => {
 
   const speed = CONFIG.PLAYER_MOVE_SPEED;
 
-  // Get mouse position relative to canvas
-  const canvasRect = canvas.getBoundingClientRect();
-  const mouseX = gameState.mouse.x - canvasRect.left;
-  const mouseY = gameState.mouse.y - canvasRect.top;
+  // Get mouse position relative to canvas (cache to avoid repeated getBoundingClientRect calls)
+  if (!gameState.cachedCanvasRect) {
+    gameState.cachedCanvasRect = canvas.getBoundingClientRect();
+  }
+  const mouseX = gameState.mouse.x - gameState.cachedCanvasRect.left;
+  const mouseY = gameState.mouse.y - gameState.cachedCanvasRect.top;
 
-  // Keyboard movement
+  // Determine if we're on mobile or desktop
+  const isMobile = isMobileDevice() || window.innerWidth <= 768;
+  
+  // Keyboard/mobile movement
   if (gameState.keys.left || gameState.keys.a) {
     gameState.player.x = Math.max(CONFIG.PLAYER_BOUNDARY_MARGIN, gameState.player.x - speed);
   }
@@ -1814,11 +1935,14 @@ const handlePlayerMovement = () => {
     gameState.player.y = Math.min(canvas.height - 15, gameState.player.y + speed);
   }
 
-  // Mouse movement (only when mouse is moving within canvas bounds)
-  if (!gameState.keys.left && !gameState.keys.right && !gameState.keys.a && !gameState.keys.d) {
-    if (mouseX >= 0 && mouseX <= canvas.width) {
-      gameState.player.x = clamp(CONFIG.PLAYER_BOUNDARY_MARGIN, canvas.width - 38 - CONFIG.PLAYER_BOUNDARY_MARGIN)(mouseX - 19);
-    }
+  // Mouse movement (ONLY on desktop when NO keys are pressed)
+  // Completely disable mouse tracking on mobile to prevent teleportation
+  const hasAnyInput = gameState.keys.left || gameState.keys.right || gameState.keys.a || gameState.keys.d ||
+                      gameState.keys.up || gameState.keys.w || gameState.keys.down || gameState.keys.s;
+  
+  // Only use mouse controls on desktop AND when no keyboard input AND mouse tracking is active
+  if (!isMobile && !hasAnyInput && mouseX >= 0 && mouseX <= canvas.width && gameState.mouseTrackingActive) {
+    gameState.player.x = clamp(CONFIG.PLAYER_BOUNDARY_MARGIN, canvas.width - 38 - CONFIG.PLAYER_BOUNDARY_MARGIN)(mouseX - 19);
   }
 
   // Tilt calculation based on movement direction
@@ -1840,7 +1964,7 @@ const handlePlayerMovement = () => {
   if (isMoving && Math.random() < 0.3) {
     const trailX = gameState.player.x;
     const trailY = gameState.player.y;
-    if (gameState.player.trailParticles.length < 10) {
+    if (gameState.player.trailParticles.length < CONFIG.PARTICLE_LIMITS.MAX_TRAIL_PARTICLES) {
       gameState.player.trailParticles.push(createTrailParticle(trailX, trailY));
     }
   }
@@ -1911,7 +2035,7 @@ const handlePlayerHit = () => {
   if (gameState.player.lives <= 0) {
     // Check if in boss level - give 2nd chance
     if (gameState.isBossLevel && !gameState.bossDefeatAttempt) {
-      console.log('Boss fight first attempt failed - respawning player for 2nd chance');
+      if (DEBUG_MODE) console.log('Boss fight first attempt failed - respawning player for 2nd chance');
       gameState.bossDefeatAttempt = true;
       gameState.player.lives = 3; // Reset lives for 2nd attempt
       gameState.player.isInvulnerable = true;
@@ -1937,7 +2061,7 @@ const handlePlayerHit = () => {
 const endGame = (victory) => {
   if (gameState.isGameOver) return;
 
-  console.log('endGame called with victory=', victory, 'current level=', gameState.level);
+  if (DEBUG_MODE) console.log('endGame called with victory=', victory, 'current level=', gameState.level);
   
   gameState.isRunning = false;
   gameState.isGameOver = true;
@@ -2014,6 +2138,13 @@ const resetGame = () => {
 
   // Disable cursor when restarting the game
   document.body.classList.remove('show-cursor');
+  
+  // Hide winner buttons if they were shown
+  const winnerButtons = gameState.debugElements?.winnerButtons || document.getElementById('winner-buttons');
+  if (winnerButtons) {
+    winnerButtons.style.display = 'none';
+    winnerButtons.style.pointerEvents = 'none';
+  }
 
   initializeBackground();
 
@@ -2029,6 +2160,7 @@ const resetGame = () => {
     isBossLevel: false,
     boss: null,
     levelComplete: false,
+    buttonsShown: false, // Reset winner buttons state
     scoring: { score: 0, comboCount: 0, lastKillTime: 0, totalKills: 0, scoreTexts: [] },
     enemyDirection: 1,
     enemyMovementState: {
@@ -2049,6 +2181,7 @@ const resetGame = () => {
 // ============================================
 
 const initializeHUD = () => {
+  // Cache all DOM queries once at initialization instead of querying repeatedly
   Object.assign(gameState.hudElements, {
     scoreDisplay: document.getElementById('score-display'),
     levelDisplay: document.getElementById('level-display'),
@@ -2057,6 +2190,19 @@ const initializeHUD = () => {
     gameOverTitle: document.getElementById('game-over-title'),
     finalScore: document.getElementById('final-score')
   });
+  
+  // Cache additional elements used in debug panel
+  if (DEBUG_MODE) {
+    gameState.debugElements = {
+      panel: document.getElementById('debug-panel'),
+      engineCheckbox: document.getElementById('debug-engine'),
+      shieldCheckbox: document.getElementById('debug-shield'),
+      trailsCheckbox: document.getElementById('debug-trails'),
+      tiltCheckbox: document.getElementById('debug-tilt'),
+      shootCheckbox: document.getElementById('debug-shoot'),
+      winnerButtons: document.getElementById('winner-buttons')
+    };
+  }
 };
 
 const drawPowerupStatus = () => {
@@ -2166,15 +2312,19 @@ const gameLoop = (currentTime) => {
         drawVictoryAnimation();
       } else {
         // Regular game over (not victory)
-        ctx.font = '168px';
+        const isMobile = isMobileDevice() || window.innerWidth <= 768;
+        
+        ctx.font = isMobile ? 'bold 60px Arial' : 'bold 168px Arial';
         ctx.fillStyle = gameState.victory ? 'green' : 'red';
-        ctx.fillText(gameState.gameOverText, (canvas.width / 2) - 200, canvas.height / 2);
+        const textWidth = (isMobile ? 120 : 200);
+        ctx.fillText(gameState.gameOverText, (canvas.width / 2) - textWidth, canvas.height / 2);
 
-        ctx.font = '48px';
+        ctx.font = isMobile ? 'bold 20px Arial' : 'bold 48px Arial';
         ctx.fillStyle = 'white';
         const timeSurvived = Math.floor((Date.now() - gameState.gameStartTime) / 1000);
-        ctx.fillText(`Score: ${gameState.scoring.score}`, (canvas.width / 2) - 100, canvas.height / 2 + 100);
-        ctx.fillText(`Time Survived: ${timeSurvived}s`, (canvas.width / 2) - 150, canvas.height / 2 + 160);
+        const offsetX = isMobile ? 50 : 100;
+        ctx.fillText(`Score: ${gameState.scoring.score}`, (canvas.width / 2) - offsetX, canvas.height / 2 + (isMobile ? 60 : 100));
+        ctx.fillText(`Time Survived: ${timeSurvived}s`, (canvas.width / 2) - (isMobile ? 75 : 150), canvas.height / 2 + (isMobile ? 100 : 160));
       }
     }
     return;
@@ -2208,7 +2358,7 @@ const gameLoop = (currentTime) => {
   if (gameState.isRunning && Math.random() < 0.7) {
     const engineX = gameState.player.x;
     const engineY = gameState.player.y + 20;
-    if (gameState.player.engineParticles.length < 15) {
+    if (gameState.player.engineParticles.length < CONFIG.PARTICLE_LIMITS.MAX_ENGINE_PARTICLES) {
       gameState.player.engineParticles.push(createEngineParticle(engineX, engineY));
     }
   }
@@ -2347,13 +2497,25 @@ const goToMainMenu = () => {
 addEventListener('mousemove', (event) => {
   gameState.mouse.x = event.clientX;
   gameState.mouse.y = event.clientY;
-
-  if (gameState.keys.left || gameState.keys.right || gameState.keys.a || gameState.keys.d) return;
-  gameState.player.x = event.clientX;
+  
+  // Invalidate cached rect on mouse move to ensure accuracy
+  gameState.cachedCanvasRect = null;
+  
+  // Only update mouse tracking if no keyboard/mobile controls are active
+  const hasInput = gameState.keys.left || gameState.keys.right || gameState.keys.a || gameState.keys.d;
+  if (!hasInput) {
+    gameState.mouseTrackingActive = true;
+  } else {
+    gameState.mouseTrackingActive = false;
+  }
 });
 
 addEventListener('click', (event) => {
   if (!gameState.isRunning) return;
+
+  // Don't shoot if click occurred inside the debug panel
+  const debugPanel = document.getElementById('debug-panel');
+  if (debugPanel && debugPanel.contains(event.target)) return;
   shootBullet();
 });
 
@@ -2364,21 +2526,26 @@ addEventListener('keydown', (event) => {
     case 'KeyA':
       gameState.keys.left = true;
       gameState.keys.a = true;
+      // Disable mouse tracking until the mouse moves again
+      gameState.mouseTrackingActive = false;
       break;
     case 'ArrowRight':
     case 'KeyD':
       gameState.keys.right = true;
       gameState.keys.d = true;
+      gameState.mouseTrackingActive = false;
       break;
     case 'ArrowUp':
     case 'KeyW':
       gameState.keys.up = true;
       gameState.keys.w = true;
+      gameState.mouseTrackingActive = false;
       break;
     case 'ArrowDown':
     case 'KeyS':
       gameState.keys.down = true;
       gameState.keys.s = true;
+      gameState.mouseTrackingActive = false;
       break;
     case 'Space':
       event.preventDefault();
@@ -2419,6 +2586,9 @@ addEventListener('keyup', (event) => {
 window.addEventListener('resize', () => {
   canvas.width = Math.min(window.innerWidth - 60, 1200);
   canvas.height = Math.min(window.innerHeight - 20, 1000);
+  
+  // Invalidate cached canvas rect
+  gameState.cachedCanvasRect = null;
 
   setTimeout(() => {
     resetGame();
@@ -2449,7 +2619,8 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
 const toggleDebugPanel = () => {
   if (!DEBUG_MODE) return;
 
-  const panel = document.getElementById('debug-panel');
+  // Use cached element instead of querying DOM
+  const panel = gameState.debugElements?.panel || document.getElementById('debug-panel');
   if (panel) {
     const isVisible = panel.style.display !== 'none';
     panel.style.display = isVisible ? 'none' : 'block';
@@ -2459,20 +2630,16 @@ const toggleDebugPanel = () => {
 };
 
 const updateDebugCheckboxes = () => {
-  if (!DEBUG_MODE) return;
+  if (!DEBUG_MODE || !gameState.debugElements) return;
 
-  const toggles = {
-    'debug-engine': () => gameState.debug.showEngineFlames,
-    'debug-shield': () => gameState.debug.showShield,
-    'debug-trails': () => gameState.debug.showTrails,
-    'debug-tilt': () => gameState.debug.tiltEnabled,
-    'debug-shoot': () => gameState.debug.forceShootAnimation
-  };
-
-  Object.entries(toggles).forEach(([id, getter]) => {
-    const checkbox = document.getElementById(id);
-    if (checkbox) checkbox.checked = getter();
-  });
+  // Use cached checkboxes
+  const { engineCheckbox, shieldCheckbox, trailsCheckbox, tiltCheckbox, shootCheckbox } = gameState.debugElements;
+  
+  if (engineCheckbox) engineCheckbox.checked = gameState.debug.showEngineFlames;
+  if (shieldCheckbox) shieldCheckbox.checked = gameState.debug.showShield;
+  if (trailsCheckbox) trailsCheckbox.checked = gameState.debug.showTrails;
+  if (tiltCheckbox) tiltCheckbox.checked = gameState.debug.tiltEnabled;
+  if (shootCheckbox) shootCheckbox.checked = gameState.debug.forceShootAnimation;
 };
 
 const triggerShieldTest = () => {
@@ -2507,7 +2674,7 @@ const clearAllParticles = () => {
 };
 
 const killAllEnemies = () => {
-  console.log('DEBUG: Killing all enemies');
+  if (DEBUG_MODE) console.log('DEBUG: Killing all enemies');
   gameState.enemies.forEach(enemy => {
     enemy.isDying = true;
     enemy.startDeathAnimation();
@@ -2521,7 +2688,7 @@ const killAllEnemies = () => {
 };
 
 const skipToBoss = () => {
-  console.log('DEBUG: Skipping to boss level');
+  if (DEBUG_MODE) console.log('DEBUG: Skipping to boss level');
   
   // Set level to 6 (boss level)
   gameState.level = 6;
@@ -2533,11 +2700,11 @@ const skipToBoss = () => {
 
 const testBossPhase = (phase) => {
   if (!gameState.isBossLevel || !gameState.boss) {
-    console.log('DEBUG: Not in boss level yet');
+    if (DEBUG_MODE) console.log('DEBUG: Not in boss level yet');
     return;
   }
   
-  console.log(`DEBUG: Setting boss to phase ${phase}`);
+  if (DEBUG_MODE) console.log(`DEBUG: Setting boss to phase ${phase}`);
   
   // Calculate health based on phase
   let healthPercent;
@@ -2569,11 +2736,11 @@ const testBossPhase = (phase) => {
     gameState.boss.trackingBurstActive = false;
   }
   
-  console.log(`Boss health set to ${Math.ceil(gameState.boss.health)}/${gameState.boss.maxHealth} (${(healthPercent * 100).toFixed(0)}%)`);
+  if (DEBUG_MODE) console.log(`Boss health set to ${Math.ceil(gameState.boss.health)}/${gameState.boss.maxHealth} (${(healthPercent * 100).toFixed(0)}%)`);
 };
 
 const testVictoryAnimation = () => {
-  console.log('DEBUG: Triggering victory animation');
+  if (DEBUG_MODE) console.log('DEBUG: Triggering victory animation');
   gameState.isRunning = false;
   gameState.isGameOver = true;
   gameState.victory = true;
@@ -2717,7 +2884,9 @@ const drawVictoryAnimation = () => {
   }
   
   // Phase 2: Show "WINNER" text with score (2.5s+)
-  ctx.font = 'bold 120px Arial';
+  const isMobile = isMobileDevice() || window.innerWidth <= 768;
+  
+  ctx.font = isMobile ? 'bold 60px Arial' : 'bold 120px Arial';
   ctx.fillStyle = '#00ffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -2727,15 +2896,16 @@ const drawVictoryAnimation = () => {
   // Pulsing glow effect
   const glow = 40 + Math.sin(elapsed / 200) * 10;
   ctx.shadowBlur = glow;
-  ctx.fillText('WINNER!', canvas.width / 2, canvas.height / 2 - 120);
+  const winnerY = isMobile ? canvas.height / 2 - 80 : canvas.height / 2 - 120;
+  ctx.fillText('WINNER!', canvas.width / 2, winnerY);
   
   // Score display
-  ctx.font = 'bold 48px Arial';
+  ctx.font = isMobile ? 'bold 24px Arial' : 'bold 48px Arial';
   ctx.fillStyle = '#ffff00';
   ctx.shadowColor = '#ffaa00';
   ctx.shadowBlur = 20;
-  ctx.fillText(`Final Score: ${gameState.scoring.score}`, canvas.width / 2, canvas.height / 2 - 20);
-  ctx.fillText('YOU SAVED THE WORLD! 🌍✨', canvas.width / 2, canvas.height / 2 + 40);
+  ctx.fillText(`Final Score: ${gameState.scoring.score}`, canvas.width / 2, canvas.height / 2 - (isMobile ? 10 : 20));
+  ctx.fillText('YOU SAVED THE WORLD! 🌍✨', canvas.width / 2, canvas.height / 2 + (isMobile ? 30 : 40));
   
   ctx.restore();
   
@@ -2745,11 +2915,28 @@ const drawVictoryAnimation = () => {
     // Enable cursor for clicking buttons
     document.body.classList.add('show-cursor');
     
-    // Show winner screen buttons
-    const winnerButtons = document.getElementById('winner-buttons');
+    // Show winner screen buttons (use cached element)
+    const winnerButtons = gameState.debugElements?.winnerButtons || document.getElementById('winner-buttons');
     if (winnerButtons) {
       winnerButtons.style.display = 'flex';
       winnerButtons.style.pointerEvents = 'auto';
+      
+      // Show appropriate control instructions based on device type
+      const controlsInstructions = document.getElementById('controls-instructions');
+      const desktopInstructions = document.getElementById('desktop-instructions');
+      const mobileInstructions = document.getElementById('mobile-instructions');
+      
+      if (controlsInstructions && desktopInstructions && mobileInstructions) {
+        if (isMobile) {
+          controlsInstructions.style.display = 'block';
+          desktopInstructions.style.display = 'none';
+          mobileInstructions.style.display = 'block';
+        } else {
+          controlsInstructions.style.display = 'block';
+          desktopInstructions.style.display = 'block';
+          mobileInstructions.style.display = 'none';
+        }
+      }
     }
   }
 };

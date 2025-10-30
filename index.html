@@ -11,38 +11,62 @@
     <p id="clickMe" class="slide-in-blurred-bottom">Click Anywhere To Play</p>
     <h1 class="slide-down" id="upperT">Corona Invader</h1>
     <div id="middleT">
-      <img
-        id="mouseRightI"
-        src="img/mouse.png"
-        class="mouse slide-in-blurred-right"
-        alt="Mouse Right"
-      />
-      <p id="mouseRightT" class="mouseT slide-in-blurred-left">
-        Move Character Right
-      </p>
-      <img
-        id="mouseLeftI"
-        src="img/mouse.png"
-        class="mouse slide-in-blurred-right"
-        alt="Mouse Left"
-      />
-      <p id="mouseLeftT" class="mouseT slide-in-blurred-left">
-        Move Character Left
-      </p>
-      <img
-        id="mouseclickI"
-        src="img/mouseL.png"
-        class="mouse slide-in-blurred-right"
-        alt="Mouse Click"
-      />
-      <p id="mouseclickT" class="mouseT slide-in-blurred-left">
-        Shoot
-      </p>
+      <!-- Desktop Controls -->
+      <div id="desktop-controls" class="control-section">
+        <div class="control-item">
+          <p class="control-desc slide-in-blurred-left">Move Left/Right</p>
+          <span class="key-badge slide-in-blurred-right">A/D or ←/→</span>
+        </div>
+        <div class="control-item">
+          <p class="control-desc slide-in-blurred-left">Move Up/Down</p>
+          <span class="key-badge slide-in-blurred-right">W/S or ↑/↓</span>
+        </div>
+        <div class="control-item">
+          <p class="control-desc slide-in-blurred-left">Shoot</p>
+          <span class="key-badge slide-in-blurred-right">Space</span>
+        </div>
+        <div class="control-note">
+          <span class="key-note">💡 Mouse click also works!</span>
+        </div>
+      </div>
+      
+      <!-- Mobile Controls -->
+      <div id="mobile-controls" class="control-section" style="display: none;">
+        <div class="control-item">
+          <p class="control-desc slide-in-blurred-left">Move</p>
+          <span class="key-badge slide-in-blurred-right">📍 Joystick (Left)</span>
+        </div>
+        <div class="control-item">
+          <p class="control-desc slide-in-blurred-left">Shoot</p>
+          <span class="key-badge slide-in-blurred-right">🔥 Fire Button (Right)</span>
+        </div>
+      </div>
     </div>
     <div id="bottomT">
       <p class="slide-in-blurred-bottom">By Ziad Alshanbari</p>
     </div>
     <script>
+      // Detect mobile device and show appropriate controls
+      const isMobileDevice = () =>
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        ('ontouchstart' in window) ||
+        (navigator.maxTouchPoints > 0) ||
+        window.innerWidth <= 768;
+
+      window.addEventListener('DOMContentLoaded', () => {
+        const isMobile = isMobileDevice();
+        const desktopControls = document.getElementById('desktop-controls');
+        const mobileControls = document.getElementById('mobile-controls');
+        
+        if (isMobile) {
+          if (desktopControls) desktopControls.style.display = 'none';
+          if (mobileControls) mobileControls.style.display = 'block';
+        } else {
+          if (desktopControls) desktopControls.style.display = 'block';
+          if (mobileControls) mobileControls.style.display = 'none';
+        }
+      });
+
       window.addEventListener("click", () => {
         window.location.href = "game.html";
       });
